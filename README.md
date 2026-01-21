@@ -13,6 +13,11 @@ O **Nails App** é uma solução completa para gerenciamento de agendamentos em 
 - Integração com calendários nativos (Google Calendar e iCloud)
 - Filtros de visualização (hoje, próximos, todos os agendamentos)
 - Lembretes automáticos 30 minutos antes do compromisso
+- **Sistema de configurações personalizáveis:**
+  - Horário de funcionamento customizável
+  - Intervalos de slots ajustáveis (15, 30, 45 ou 60 minutos)
+  - Modo escuro/claro
+  - Cadastro de feriados e dias de folga
 - Interface moderna com Material Design 3
 - Suporte multiplataforma (iOS, Android, Web)
 
@@ -34,9 +39,10 @@ O **Nails App** é uma solução completa para gerenciamento de agendamentos em 
 - **dayjs** - Manipulação de datas
 - **UUID** - Geração de identificadores únicos
 
-### Integrações
+### Integrações & Utilities
 - **Expo Calendar** - Sincronização com calendários nativos
 - **Expo Notifications** - Suporte a notificações push
+- **@react-native-community/datetimepicker** - Seleção nativa de datas e horários (iOS/Android)
 
 ## Estrutura do Projeto
 
@@ -49,7 +55,8 @@ nails/
 │   │   ├── ServicesScreen.tsx       # Listagem e gerenciamento de serviços
 │   │   ├── CreateServiceScreen.tsx  # Formulário de criação/edição de serviços
 │   │   ├── ScheduleScreen.tsx       # Listagem de agendamentos com filtros
-│   │   └── CreateScheduleScreen.tsx # Formulário de novo agendamento
+│   │   ├── CreateScheduleScreen.tsx # Formulário de novo agendamento
+│   │   └── SettingsScreen.tsx       # Tela de configurações do sistema
 │   │
 │   ├── components/                  # Componentes reutilizáveis
 │   │   ├── BigButton.tsx           # Botões grandes para ações principais
@@ -67,11 +74,16 @@ nails/
 │   ├── services/                    # Lógica de negócio e acesso a dados
 │   │   ├── serviceRepository.ts    # CRUD de serviços (AsyncStorage)
 │   │   ├── appointmentRepository.ts # CRUD de agendamentos + detecção de conflitos
+│   │   ├── settingsRepository.ts   # Gerenciamento de configurações do sistema
 │   │   └── calendarService.ts      # Integração com calendários nativos
 │   │
 │   ├── hooks/                       # Custom React Hooks
 │   │   ├── useServices.ts          # Gerenciamento de estado de serviços
-│   │   └── useAppointments.ts      # Gerenciamento de agendamentos e calendário
+│   │   ├── useAppointments.ts      # Gerenciamento de agendamentos e calendário
+│   │   └── useSettings.ts          # Gerenciamento de configurações do sistema
+│   │
+│   ├── context/                     # Context API
+│   │   └── ThemeContext.tsx        # Gerenciamento de tema claro/escuro
 │   │
 │   ├── storage/
 │   │   └── asyncStorage.ts         # Utilitários de AsyncStorage
@@ -134,15 +146,18 @@ npm run web
 ## Regras de Negócio
 
 ### Horário de Funcionamento
-- **Horário:** 8:00 - 18:00
-- **Intervalos:** Slots de 30 minutos
+- **Horário padrão:** 8:00 - 18:00 (configurável)
+- **Intervalos:** 15, 30, 45 ou 60 minutos (configurável)
 - **Cálculo automático:** Horário de término baseado na duração do serviço
+- **Feriados:** Dias marcados como feriado bloqueiam agendamentos automaticamente
 
 ### Agendamentos
 - Detecção automática de conflitos (evita dupla marcação)
 - Validação de data (apenas hoje ou datas futuras)
 - Nome do cliente obrigatório
 - Duração definida pelo serviço selecionado
+- Horários respeitam as configurações personalizadas do sistema
+- Feriados cadastrados bloqueiam completamente o dia
 
 ### Armazenamento
 - Dados armazenados localmente no dispositivo
@@ -160,12 +175,132 @@ npm run web
 ### Custom Hooks
 - `useServices()` - Gerencia estado e operações de serviços
 - `useAppointments()` - Gerencia agendamentos, conflitos e sincronização de calendário
+- `useSettings()` - Gerencia configurações do sistema (horários, slots, tema, feriados)
 
 ### TypeScript-First
 - Modo strict habilitado
 - Definições completas de interfaces
 - DTOs para operações de criação/atualização
 - Parâmetros de navegação type-safe
+
+## Módulo de Configurações
+
+O aplicativo possui um sistema completo de configurações personalizáveis que permite adaptar o funcionamento do salão às necessidades específicas.
+
+### Funcionalidades de Configuração
+
+#### 1. Horário de Funcionamento Personalizável
+- Interface com **time picker nativo** (estilo alarme)
+- Configuração separada para:
+  - **Hora de Início:** Define quando o salão abre
+  - **Hora de Término:** Define quando o salão fecha
+- **Validação inteligente:** Impede horário de início posterior ao de término
+- **Plataforma específica:**
+  - iOS: Picker estilo spinner com diálogo de confirmação
+  - Android: Picker nativo com aplicação imediata
+- Horários aplicam-se automaticamente a todos os agendamentos
+
+#### 2. Intervalos de Slots Configuráveis
+- **Opções disponíveis:**
+  - 15 minutos
+  - 30 minutos (padrão)
+  - 45 minutos
+  - 1 hora
+- **Interface:** Botões segmentados para seleção rápida
+- **Aplicação imediata:** Novos agendamentos usam o intervalo configurado
+- **Preserva agendamentos existentes:** Mudanças não afetam agendamentos já marcados
+
+#### 3. Tema Claro/Escuro
+- **Switch simples** para alternar entre temas
+- **Persistente:** Configuração salva e carregada automaticamente
+- **Adaptação completa:**
+  - Background, superfícies e textos
+  - Cards e componentes
+  - Headers de navegação
+  - Ícones e bordas
+- **Material Design 3:** Cores e elevações otimizadas para ambos os modos
+
+#### 4. Cadastro de Feriados
+- **Seleção via calendário nativo**
+- **Diferenças por plataforma:**
+  - **Android:** Seleção e cadastro automático ao escolher data
+  - **iOS:** Diálogo com prévia da data e botão de confirmação
+- **Visualização:** Chips organizados com data formatada (DD/MM/YYYY)
+- **Remoção:** Toque no X do chip com confirmação
+- **Bloqueio automático:**
+  - Feriados não aparecem como opções de agendamento
+  - Tela de seleção exibe aviso "(Feriado)" e desabilita o botão
+  - Mensagem "Sem atendimento neste dia"
+- **Validação:** Apenas datas futuras podem ser cadastradas
+
+### Arquitetura das Configurações
+
+#### Repository Pattern
+```typescript
+LocalSettingsRepository
+├── getSettings() - Carrega configurações ou retorna padrões
+├── updateSettings() - Atualiza configurações específicas
+├── addHoliday() - Adiciona feriado com verificação de duplicatas
+├── removeHoliday() - Remove feriado específico
+├── isHoliday() - Verifica se data é feriado
+└── resetToDefaults() - Restaura configurações de fábrica
+```
+
+#### Custom Hook
+```typescript
+useSettings()
+├── settings - Estado atual das configurações
+├── loading - Estado de carregamento
+├── error - Mensagens de erro
+├── updateBusinessHours() - Atualiza horários com validação
+├── updateTimeSlotInterval() - Atualiza intervalo de slots
+├── updateTheme() - Altera tema
+├── addHoliday() - Adiciona feriado
+├── removeHoliday() - Remove feriado
+├── isHoliday() - Verifica feriado
+└── resetToDefaults() - Reset completo
+```
+
+#### Theme Context
+```typescript
+ThemeContext
+├── theme - Tema atual (light/dark)
+├── themeMode - Modo atual ('light' | 'dark')
+├── toggleTheme() - Alterna entre temas
+└── setThemeMode() - Define tema específico
+```
+
+### Configurações Padrão
+
+```typescript
+{
+  businessHours: {
+    start: 8,  // 8:00
+    end: 18    // 18:00
+  },
+  timeSlotInterval: 30,  // 30 minutos
+  theme: 'light',
+  holidays: []
+}
+```
+
+### Persistência
+
+- **Armazenamento:** AsyncStorage local
+- **Chave:** `@nails/settings`
+- **Formato:** JSON serializado
+- **Timestamps:** `createdAt` e `updatedAt` para auditoria
+- **Fallback:** Retorna configurações padrão em caso de erro
+
+### Integração com Agendamentos
+
+As configurações afetam diretamente o sistema de agendamentos:
+
+1. **Geração de Slots:** Função `generateTimeSlotsWithSettings()` usa configurações dinâmicas
+2. **Horários Disponíveis:** Baseados em `businessHours.start` e `businessHours.end`
+3. **Intervalos:** Respeitam `timeSlotInterval` configurado
+4. **Feriados:** Datas em `holidays[]` retornam slots vazios (bloqueio automático)
+5. **Validação:** Impede agendamentos fora do horário ou em feriados
 
 ## Integrações
 
@@ -188,7 +323,7 @@ npm run web
 
 ## Fluxo do Usuário
 
-1. **Tela Inicial** → Escolher "Serviços" ou "Agendamentos"
+1. **Tela Inicial** → Escolher "Agendamentos", "Serviços" ou "Configurações"
 
 2. **Fluxo de Serviços:**
    - Visualizar todos os serviços
@@ -202,12 +337,41 @@ npm run web
      - Nome do cliente → Serviço → Data → Horário → Confirmar
    - Evento de calendário criado automaticamente
    - Excluir agendamento com confirmação
+   - Sistema respeita horários configurados e bloqueia feriados
+
+4. **Fluxo de Configurações:**
+   - **Horário de Funcionamento:**
+     - Ajustar hora de início (time picker nativo)
+     - Ajustar hora de término (time picker nativo)
+     - Validação automática (início < término)
+   - **Intervalo dos Slots:**
+     - Escolher entre 15, 30, 45 ou 60 minutos
+     - Atualização imediata nos agendamentos
+   - **Modo Escuro:**
+     - Ativar/desativar tema escuro
+     - Cores adaptadas automaticamente em toda a interface
+   - **Feriados:**
+     - Adicionar feriados via calendário nativo
+     - Visualizar feriados cadastrados
+     - Remover feriados com confirmação
+     - Agendamentos bloqueados automaticamente em feriados
 
 ## Tema e Cores
 
 - **Cor Primária:** #E91E63 (Rosa - típico para apps de salão de beleza)
 - **Cor Secundária:** #9C27B0 (Roxo)
-- **Tema:** Material Design 3 (light)
+- **Temas:** Material Design 3 com suporte a modo claro e escuro
+
+### Tema Claro
+- Background: #FAFAFA
+- Surface: #FFFFFF
+- Text: #212121
+
+### Tema Escuro
+- Background: #121212
+- Surface: #1E1E1E
+- Text: #E0E0E0
+- Elevações com diferentes níveis de cinza para profundidade visual
 
 ## Scripts Disponíveis
 
