@@ -86,6 +86,44 @@ export interface OperationResult<T = void> {
 }
 
 /**
+ * Intervalo de tempo para slots de agendamento
+ */
+export type TimeSlotInterval = 15 | 30 | 45 | 60;
+
+/**
+ * Tema do aplicativo
+ */
+export type ThemeMode = 'light' | 'dark';
+
+/**
+ * Configurações do sistema
+ */
+export interface AppSettings {
+  businessHours: {
+    start: number; // Hora de início (0-23)
+    end: number; // Hora de fim (0-23)
+  };
+  timeSlotInterval: TimeSlotInterval; // Intervalo dos slots em minutos
+  theme: ThemeMode;
+  holidays: string[]; // Array de datas no formato YYYY-MM-DD
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Dados para atualizar configurações
+ */
+export interface UpdateSettingsDTO {
+  businessHours?: {
+    start: number;
+    end: number;
+  };
+  timeSlotInterval?: TimeSlotInterval;
+  theme?: ThemeMode;
+  holidays?: string[];
+}
+
+/**
  * Tipo para navegação do app
  */
 export type RootStackParamList = {
@@ -94,4 +132,5 @@ export type RootStackParamList = {
   CreateService: { serviceId?: string };
   Schedule: undefined;
   CreateSchedule: undefined;
+  Settings: undefined;
 };

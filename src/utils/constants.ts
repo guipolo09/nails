@@ -8,6 +8,7 @@
 export const STORAGE_KEYS = {
   SERVICES: '@nails/services',
   APPOINTMENTS: '@nails/appointments',
+  SETTINGS: '@nails/settings',
 } as const;
 
 /**

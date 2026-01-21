@@ -4,8 +4,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Card, Text, IconButton, Chip } from 'react-native-paper';
-import { COLORS } from '../utils/constants';
+import { Card, Text, IconButton, Chip, useTheme } from 'react-native-paper';
 import { formatDate, formatDateLong } from '../utils/helpers';
 import type { Appointment } from '../types';
 import dayjs from 'dayjs';
@@ -21,34 +20,51 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDelete,
   showDate = true,
 }) => {
+  const theme = useTheme();
   const isToday = appointment.date === dayjs().format('YYYY-MM-DD');
   const isPast = dayjs(appointment.date).isBefore(dayjs(), 'day');
 
   return (
     <Card style={[styles.card, isPast && styles.cardPast]} mode="elevated">
       <Card.Content style={styles.content}>
-        <View style={styles.timeColumn}>
-          <Text style={styles.time}>{appointment.startTime}</Text>
-          <Text style={styles.timeSeparator}>|</Text>
-          <Text style={styles.timeEnd}>{appointment.endTime}</Text>
+        <View style={[styles.timeColumn, { borderRightColor: theme.colors.primary }]}>
+          <Text style={[styles.time, { color: theme.colors.primary }]}>
+            {appointment.startTime}
+          </Text>
+          <Text style={[styles.timeSeparator, { color: theme.colors.onSurfaceVariant }]}>
+            |
+          </Text>
+          <Text style={[styles.timeEnd, { color: theme.colors.onSurfaceVariant }]}>
+            {appointment.endTime}
+          </Text>
         </View>
 
         <View style={styles.info}>
-          <Text style={[styles.clientName, isPast && styles.textPast]}>
+          <Text
+            style={[
+              styles.clientName,
+              { color: isPast ? theme.colors.onSurfaceVariant : theme.colors.onSurface },
+            ]}
+          >
             {appointment.clientName}
           </Text>
-          <Text style={[styles.serviceName, isPast && styles.textPast]}>
+          <Text
+            style={[
+              styles.serviceName,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
             {appointment.serviceName}
           </Text>
           {showDate && (
-            <Text style={styles.date}>
+            <Text style={[styles.date, { color: theme.colors.onSurfaceVariant }]}>
               {isToday ? 'Hoje' : formatDateLong(appointment.date)}
             </Text>
           )}
           {appointment.calendarEventId && (
             <Chip
               icon="calendar-check"
-              style={styles.chip}
+              style={[styles.chip, { backgroundColor: theme.colors.primaryContainer }]}
               textStyle={styles.chipText}
               compact
             >
@@ -61,7 +77,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <IconButton
             icon="close-circle"
             size={28}
-            iconColor={COLORS.error}
+            iconColor={theme.colors.error}
             onPress={onDelete}
           />
         )}
@@ -87,21 +103,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingRight: 16,
     borderRightWidth: 2,
-    borderRightColor: COLORS.primary,
     marginRight: 16,
   },
   time: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.primary,
   },
   timeSeparator: {
     fontSize: 12,
-    color: COLORS.textSecondary,
   },
   timeEnd: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   info: {
     flex: 1,
@@ -109,25 +121,18 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.text,
   },
   serviceName: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 2,
-  },
-  textPast: {
-    color: COLORS.textSecondary,
   },
   date: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 4,
   },
   chip: {
     alignSelf: 'flex-start',
     marginTop: 8,
-    backgroundColor: COLORS.primaryLight,
     height: 24,
   },
   chipText: {

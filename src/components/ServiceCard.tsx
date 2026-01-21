@@ -4,8 +4,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Card, Text, IconButton } from 'react-native-paper';
-import { COLORS } from '../utils/constants';
+import { Card, Text, IconButton, useTheme } from 'react-native-paper';
 import { formatDuration } from '../utils/helpers';
 import type { Service } from '../types';
 
@@ -26,16 +25,27 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   selectable = false,
   selected = false,
 }) => {
+  const theme = useTheme();
+
   return (
     <Card
-      style={[styles.card, selected && styles.cardSelected]}
+      style={[
+        styles.card,
+        selected && {
+          backgroundColor: theme.colors.primaryContainer,
+          borderWidth: 2,
+          borderColor: theme.colors.primary,
+        },
+      ]}
       onPress={selectable ? onSelect : undefined}
       mode={selected ? 'contained' : 'elevated'}
     >
       <Card.Content style={styles.content}>
         <View style={styles.info}>
-          <Text style={styles.name}>{service.name}</Text>
-          <Text style={styles.duration}>
+          <Text style={[styles.name, { color: theme.colors.onSurface }]}>
+            {service.name}
+          </Text>
+          <Text style={[styles.duration, { color: theme.colors.onSurfaceVariant }]}>
             {formatDuration(service.durationMinutes)}
           </Text>
         </View>
@@ -45,7 +55,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
               <IconButton
                 icon="pencil"
                 size={24}
-                iconColor={COLORS.primary}
+                iconColor={theme.colors.primary}
                 onPress={onEdit}
               />
             )}
@@ -53,7 +63,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
               <IconButton
                 icon="delete"
                 size={24}
-                iconColor={COLORS.error}
+                iconColor={theme.colors.error}
                 onPress={onDelete}
               />
             )}
@@ -69,11 +79,6 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
   },
-  cardSelected: {
-    backgroundColor: COLORS.primaryLight,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -85,11 +90,9 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.text,
   },
   duration: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 4,
   },
   actions: {

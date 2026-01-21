@@ -7,3 +7,4 @@ export { ServicesScreen } from './ServicesScreen';
 export { CreateServiceScreen } from './CreateServiceScreen';
 export { ScheduleScreen } from './ScheduleScreen';
 export { CreateScheduleScreen } from './CreateScheduleScreen';
+export { SettingsScreen } from './SettingsScreen';

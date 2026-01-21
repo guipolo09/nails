@@ -54,3 +54,13 @@ export const clearAllData = async (): Promise<void> => {
     throw error;
   }
 };
+
+/**
+ * Alias para loadData (compatibilidade)
+ */
+export const getItem = loadData;
+
+/**
+ * Alias para saveData (compatibilidade)
+ */
+export const setItem = saveData;

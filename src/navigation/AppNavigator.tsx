@@ -4,34 +4,36 @@
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { IconButton } from 'react-native-paper';
+import { useTheme as usePaperTheme } from 'react-native-paper';
 import {
   HomeScreen,
   ServicesScreen,
   CreateServiceScreen,
   ScheduleScreen,
   CreateScheduleScreen,
+  SettingsScreen,
 } from '../screens';
-import { COLORS } from '../utils/constants';
 import type { RootStackParamList } from '../types';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const screenOptions = {
-  headerStyle: {
-    backgroundColor: COLORS.primary,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  headerTintColor: '#FFFFFF',
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-    fontSize: 18,
-  },
-  headerBackTitleVisible: false,
-};
-
 export const AppNavigator: React.FC = () => {
+  const theme = usePaperTheme();
+
+  const screenOptions = {
+    headerStyle: {
+      backgroundColor: theme.colors.primary,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+    headerTintColor: '#FFFFFF',
+    headerTitleStyle: {
+      fontWeight: '600' as const,
+      fontSize: 18,
+    },
+    headerBackTitleVisible: false,
+  };
+
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
@@ -71,6 +73,14 @@ export const AppNavigator: React.FC = () => {
         component={CreateScheduleScreen}
         options={{
           title: 'Novo Agendamento',
+        }}
+      />
+
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          title: 'Configurações',
         }}
       />
     </Stack.Navigator>

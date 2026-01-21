@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../utils/constants';
+import { useTheme } from 'react-native-paper';
 
 interface ScreenContainerProps {
   children: React.ReactNode;
@@ -18,6 +18,8 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   scroll = true,
   padding = true,
 }) => {
+  const theme = useTheme();
+
   const content = (
     <View style={[styles.content, padding && styles.padding]}>
       {children}
@@ -25,7 +27,10 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      edges={['bottom']}
+    >
       {scroll ? (
         <ScrollView
           style={styles.scroll}
@@ -45,7 +50,6 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   scroll: {
     flex: 1,

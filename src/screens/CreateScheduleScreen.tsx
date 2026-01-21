@@ -17,9 +17,9 @@ import {
   LoadingState,
   EmptyState,
 } from '../components';
-import { useServices, useAppointments } from '../hooks';
+import { useServices, useAppointments, useSettings } from '../hooks';
 import { COLORS, MESSAGES } from '../utils/constants';
-import { generateTimeSlots, formatDateLong, calculateEndTime } from '../utils/helpers';
+import { generateTimeSlotsWithSettings, formatDateLong, calculateEndTime } from '../utils/helpers';
 import type { RootStackParamList, Service, Appointment } from '../types';
 
 type CreateScheduleNavigationProp = StackNavigationProp<RootStackParamList, 'CreateSchedule'>;
@@ -30,6 +30,7 @@ export const CreateScheduleScreen: React.FC = () => {
   const navigation = useNavigation<CreateScheduleNavigationProp>();
   const { services, loading: loadingServices } = useServices();
   const { createAppointment, getAppointmentsByDate } = useAppointments();
+  const { settings } = useSettings();
 
   // Estados do fluxo
   const [currentStep, setCurrentStep] = useState<Step>('name');
@@ -49,14 +50,17 @@ export const CreateScheduleScreen: React.FC = () => {
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = dayjs().add(i, 'day');
+      const dateString = date.format('YYYY-MM-DD');
+      const isHoliday = settings?.holidays.includes(dateString) || false;
       dates.push({
-        value: date.format('YYYY-MM-DD'),
-        label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : formatDateLong(date.format('YYYY-MM-DD')),
+        value: dateString,
+        label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : formatDateLong(dateString),
         weekday: date.format('ddd'),
+        isHoliday,
       });
     }
     return dates;
-  }, []);
+  }, [settings]);
 
   // Carregar agendamentos do dia selecionado
   useEffect(() => {
@@ -65,11 +69,16 @@ export const CreateScheduleScreen: React.FC = () => {
     }
   }, [selectedDate, getAppointmentsByDate]);
 
-  // Gerar slots de horário
+  // Gerar slots de horário (com configurações dinâmicas)
   const timeSlots = useMemo(() => {
     if (!selectedDate || !selectedService) return [];
-    return generateTimeSlots(selectedDate, dayAppointments, selectedService.durationMinutes);
-  }, [selectedDate, selectedService, dayAppointments]);
+    return generateTimeSlotsWithSettings(
+      selectedDate,
+      dayAppointments,
+      selectedService.durationMinutes,
+      settings
+    );
+  }, [selectedDate, selectedService, dayAppointments, settings]);
 
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
@@ -235,29 +244,54 @@ export const CreateScheduleScreen: React.FC = () => {
         Serviço: {selectedService?.name}
       </Text>
       {availableDates.map(item => (
-        <BigButton
-          key={item.value}
-          label={item.label}
-          mode={selectedDate === item.value ? 'contained' : 'outlined'}
-          onPress={() => handleSelectDate(item.value)}
-        />
+        <View key={item.value}>
+          <BigButton
+            label={item.isHoliday ? `${item.label} (Feriado)` : item.label}
+            mode={selectedDate === item.value ? 'contained' : 'outlined'}
+            onPress={() => handleSelectDate(item.value)}
+            disabled={item.isHoliday}
+          />
+          {item.isHoliday && (
+            <Text style={styles.holidayText}>
+              Sem atendimento neste dia
+            </Text>
+          )}
+        </View>
       ))}
     </>
   );
 
-  const renderTimeStep = () => (
-    <>
-      <Text style={styles.stepTitle}>Selecione o horário</Text>
-      <Text style={styles.selectedInfo}>
-        {selectedService?.name} - {formatDateLong(selectedDate!)}
-      </Text>
-      <TimeSlotPicker
-        slots={timeSlots}
-        selectedTime={selectedTime}
-        onSelectTime={handleSelectTime}
-      />
-    </>
-  );
+  const renderTimeStep = () => {
+    const isHoliday = settings?.holidays.includes(selectedDate!) || false;
+
+    return (
+      <>
+        <Text style={styles.stepTitle}>Selecione o horário</Text>
+        <Text style={styles.selectedInfo}>
+          {selectedService?.name} - {formatDateLong(selectedDate!)}
+        </Text>
+        {isHoliday ? (
+          <EmptyState
+            icon="calendar-remove"
+            title="Feriado"
+            description="Não há atendimento neste dia"
+          />
+        ) : timeSlots.length === 0 ? (
+          <EmptyState
+            icon="clock-alert"
+            title="Sem horários"
+            description="Todos os horários estão ocupados"
+          />
+        ) : (
+          <TimeSlotPicker
+            slots={timeSlots}
+            selectedTime={selectedTime}
+            onSelectTime={handleSelectTime}
+          />
+        )}
+      </>
+    );
+  };
 
   const renderConfirmStep = () => {
     const endTime = selectedTime && selectedService
@@ -427,5 +461,12 @@ const styles = StyleSheet.create({
   },
   divider: {
     backgroundColor: COLORS.border,
+  },
+  holidayText: {
+    fontSize: 12,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginTop: -8,
+    marginBottom: 8,
   },
 });

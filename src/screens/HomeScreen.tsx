@@ -3,7 +3,7 @@
 // ============================================
 
 import React from 'react';
-import { StyleSheet, View, Image } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -31,16 +31,23 @@ export const HomeScreen: React.FC = () => {
         />
 
         <BigButton
-          label="Servi\u00e7os"
+          label="Serviços"
           icon="nail"
           onPress={() => navigation.navigate('Services')}
+          mode="outlined"
+        />
+
+        <BigButton
+          label="Configurações"
+          icon="cog"
+          onPress={() => navigation.navigate('Settings')}
           mode="outlined"
         />
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Toque em um bot\u00e3o para come\u00e7ar
+          Toque em um botão para começar
         </Text>
       </View>
     </ScreenContainer>

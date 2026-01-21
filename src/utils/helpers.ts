@@ -4,7 +4,7 @@
 
 import dayjs from 'dayjs';
 import { BUSINESS_HOURS } from './constants';
-import type { TimeSlot, Appointment } from '../types';
+import type { TimeSlot, Appointment, AppSettings } from '../types';
 
 /**
  * Gera um ID único (compatível com React Native)
@@ -70,6 +70,7 @@ export const calculateEndTime = (startTime: string, durationMinutes: number): st
 
 /**
  * Gera slots de horário para um dia
+ * Versão legada (usa configurações padrão)
  */
 export const generateTimeSlots = (
   date: string,
@@ -91,6 +92,55 @@ export const generateTimeSlots = (
       // Verificar se o slot termina dentro do horário de funcionamento
       const [endHour] = endTime.split(':').map(Number);
       if (endHour > END || (endHour === END && minute > 0)) {
+        continue;
+      }
+
+      // Verificar conflitos
+      const hasConflict = checkTimeConflict(time, endTime, dayAppointments);
+
+      slots.push({
+        time,
+        available: !hasConflict,
+      });
+    }
+  }
+
+  return slots;
+};
+
+/**
+ * Gera slots de horário para um dia (com configurações personalizadas)
+ */
+export const generateTimeSlotsWithSettings = (
+  date: string,
+  appointments: Appointment[],
+  serviceDuration: number,
+  settings: AppSettings | null
+): TimeSlot[] => {
+  const slots: TimeSlot[] = [];
+
+  // Usar configurações personalizadas ou padrão
+  const START = settings?.businessHours.start ?? BUSINESS_HOURS.START;
+  const END = settings?.businessHours.end ?? BUSINESS_HOURS.END;
+  const SLOT_INTERVAL = settings?.timeSlotInterval ?? BUSINESS_HOURS.SLOT_INTERVAL;
+
+  // Verificar se é feriado
+  if (settings?.holidays.includes(date)) {
+    return []; // Retorna array vazio se for feriado
+  }
+
+  // Filtrar agendamentos do dia
+  const dayAppointments = appointments.filter(a => a.date === date);
+
+  // Gerar slots com intervalo configurado
+  for (let hour = START; hour < END; hour++) {
+    for (let minute = 0; minute < 60; minute += SLOT_INTERVAL) {
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      const endTime = calculateEndTime(time, serviceDuration);
+
+      // Verificar se o slot termina dentro do horário de funcionamento
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      if (endHour > END || (endHour === END && endMinute > 0)) {
         continue;
       }
 

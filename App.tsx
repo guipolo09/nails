@@ -12,18 +12,28 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 
 import { AppNavigator } from './src/navigation';
-import { theme } from './src/utils/theme';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+
+function AppContent() {
+  const { theme, themeMode } = useTheme();
+
+  return (
+    <PaperProvider theme={theme}>
+      <NavigationContainer>
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'auto'} />
+        <AppNavigator />
+      </NavigationContainer>
+    </PaperProvider>
+  );
+}
 
 export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
-        <PaperProvider theme={theme}>
-          <NavigationContainer>
-            <StatusBar style="light" />
-            <AppNavigator />
-          </NavigationContainer>
-        </PaperProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
