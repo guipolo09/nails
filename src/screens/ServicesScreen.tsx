@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, FlatList } from 'react-native';
-import { FAB, Snackbar, Text } from 'react-native-paper';
+import { FAB, Snackbar, Text, useTheme } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
@@ -15,7 +15,6 @@ import {
   ConfirmDialog,
 } from '../components';
 import { useServices } from '../hooks';
-import { COLORS } from '../utils/constants';
 import type { RootStackParamList, Service } from '../types';
 
 type ServicesNavigationProp = StackNavigationProp<RootStackParamList, 'Services'>;
@@ -23,6 +22,7 @@ type ServicesNavigationProp = StackNavigationProp<RootStackParamList, 'Services'
 export const ServicesScreen: React.FC = () => {
   const navigation = useNavigation<ServicesNavigationProp>();
   const { services, loading, deleteService, refresh } = useServices();
+  const theme = useTheme();
 
   // Recarrega os dados quando a tela ganha foco
   useFocusEffect(
@@ -75,8 +75,10 @@ export const ServicesScreen: React.FC = () => {
   return (
     <ScreenContainer padding={false} scroll={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Meus Serviços</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+          Meus Serviços
+        </Text>
+        <Text style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
           {services.length} serviço(s) cadastrado(s)
         </Text>
       </View>
@@ -104,7 +106,7 @@ export const ServicesScreen: React.FC = () => {
 
       <FAB
         icon="plus"
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         onPress={() => navigation.navigate('CreateService', {})}
         color="#FFFFFF"
       />
@@ -139,11 +141,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.text,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 4,
   },
   list: {
@@ -155,7 +155,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 20,
-    backgroundColor: COLORS.primary,
   },
   snackbar: {
     marginBottom: 80,

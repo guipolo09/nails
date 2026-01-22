@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Text, Snackbar, Divider, TextInput } from 'react-native-paper';
+import { Text, Snackbar, Divider, TextInput, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import dayjs from 'dayjs';
@@ -18,7 +18,7 @@ import {
   EmptyState,
 } from '../components';
 import { useServices, useAppointments, useSettings } from '../hooks';
-import { COLORS, MESSAGES } from '../utils/constants';
+import { COLORS } from '../utils/constants';
 import { generateTimeSlotsWithSettings, formatDateLong, calculateEndTime } from '../utils/helpers';
 import type { RootStackParamList, Service, Appointment } from '../types';
 
@@ -31,6 +31,7 @@ export const CreateScheduleScreen: React.FC = () => {
   const { services, loading: loadingServices } = useServices();
   const { createAppointment, getAppointmentsByDate } = useAppointments();
   const { settings } = useSettings();
+  const theme = useTheme();
 
   // Estados do fluxo
   const [currentStep, setCurrentStep] = useState<Step>('name');
@@ -195,13 +196,15 @@ export const CreateScheduleScreen: React.FC = () => {
 
   const renderNameStep = () => (
     <>
-      <Text style={styles.stepTitle}>Nome do cliente</Text>
+      <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
+        Nome do cliente
+      </Text>
       <TextInput
         label="Digite o nome"
         value={clientName}
         onChangeText={setClientName}
         mode="outlined"
-        style={styles.input}
+        style={[styles.input, { backgroundColor: theme.colors.surface }]}
         autoCapitalize="words"
         maxLength={50}
         autoFocus
@@ -216,7 +219,9 @@ export const CreateScheduleScreen: React.FC = () => {
 
   const renderServiceStep = () => (
     <>
-      <Text style={styles.stepTitle}>Selecione o serviço</Text>
+      <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
+        Selecione o serviço
+      </Text>
       {services.length === 0 ? (
         <EmptyState
           icon="nail"
@@ -239,8 +244,10 @@ export const CreateScheduleScreen: React.FC = () => {
 
   const renderDateStep = () => (
     <>
-      <Text style={styles.stepTitle}>Selecione a data</Text>
-      <Text style={styles.selectedInfo}>
+      <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
+        Selecione a data
+      </Text>
+      <Text style={[styles.selectedInfo, { color: theme.colors.primary }]}>
         Serviço: {selectedService?.name}
       </Text>
       {availableDates.map(item => (
@@ -252,7 +259,7 @@ export const CreateScheduleScreen: React.FC = () => {
             disabled={item.isHoliday}
           />
           {item.isHoliday && (
-            <Text style={styles.holidayText}>
+            <Text style={[styles.holidayText, { color: theme.colors.error }]}>
               Sem atendimento neste dia
             </Text>
           )}
@@ -266,8 +273,10 @@ export const CreateScheduleScreen: React.FC = () => {
 
     return (
       <>
-        <Text style={styles.stepTitle}>Selecione o horário</Text>
-        <Text style={styles.selectedInfo}>
+        <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
+          Selecione o horário
+        </Text>
+        <Text style={[styles.selectedInfo, { color: theme.colors.primary }]}>
           {selectedService?.name} - {formatDateLong(selectedDate!)}
         </Text>
         {isHoliday ? (
@@ -300,27 +309,43 @@ export const CreateScheduleScreen: React.FC = () => {
 
     return (
       <>
-        <Text style={styles.stepTitle}>Confirmar agendamento</Text>
+        <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
+          Confirmar agendamento
+        </Text>
 
-        <View style={styles.confirmCard}>
+        <View style={[styles.confirmCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.confirmRow}>
-            <Text style={styles.confirmLabel}>Cliente</Text>
-            <Text style={styles.confirmValue}>{clientName}</Text>
+            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
+              Cliente
+            </Text>
+            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
+              {clientName}
+            </Text>
           </View>
-          <Divider style={styles.divider} />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
           <View style={styles.confirmRow}>
-            <Text style={styles.confirmLabel}>Serviço</Text>
-            <Text style={styles.confirmValue}>{selectedService?.name}</Text>
+            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
+              Serviço
+            </Text>
+            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
+              {selectedService?.name}
+            </Text>
           </View>
-          <Divider style={styles.divider} />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
           <View style={styles.confirmRow}>
-            <Text style={styles.confirmLabel}>Data</Text>
-            <Text style={styles.confirmValue}>{formatDateLong(selectedDate!)}</Text>
+            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
+              Data
+            </Text>
+            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
+              {formatDateLong(selectedDate!)}
+            </Text>
           </View>
-          <Divider style={styles.divider} />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
           <View style={styles.confirmRow}>
-            <Text style={styles.confirmLabel}>Horário</Text>
-            <Text style={styles.confirmValue}>
+            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
+              Horário
+            </Text>
+            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
               {selectedTime} às {endTime}
             </Text>
           </View>
@@ -420,21 +445,17 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.text,
     marginBottom: 16,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: COLORS.surface,
   },
   selectedInfo: {
     fontSize: 14,
-    color: COLORS.primary,
     marginBottom: 16,
     fontWeight: '500',
   },
   confirmCard: {
-    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -452,19 +473,16 @@ const styles = StyleSheet.create({
   },
   confirmLabel: {
     fontSize: 14,
-    color: COLORS.textSecondary,
   },
   confirmValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.text,
   },
   divider: {
-    backgroundColor: COLORS.border,
+    // backgroundColor será aplicada dinamicamente
   },
   holidayText: {
     fontSize: 12,
-    color: COLORS.error,
     textAlign: 'center',
     marginTop: -8,
     marginBottom: 8,

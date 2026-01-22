@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Text, Snackbar } from 'react-native-paper';
+import { TextInput, Text, Snackbar, useTheme } from 'react-native-paper';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer, BigButton } from '../components';
@@ -19,6 +19,7 @@ export const CreateServiceScreen: React.FC = () => {
   const navigation = useNavigation<CreateServiceNavigationProp>();
   const route = useRoute<CreateServiceRouteProp>();
   const { services, createService, updateService } = useServices();
+  const theme = useTheme();
 
   const editingServiceId = route.params?.serviceId;
   const isEditing = !!editingServiceId;
@@ -96,10 +97,10 @@ export const CreateServiceScreen: React.FC = () => {
     >
       <ScreenContainer>
         <View style={styles.header}>
-          <Text style={styles.title}>
+          <Text style={[styles.title, { color: theme.colors.onBackground }]}>
             {isEditing ? 'Editar Serviço' : 'Novo Serviço'}
           </Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
             Preencha os dados do serviço
           </Text>
         </View>
@@ -110,7 +111,7 @@ export const CreateServiceScreen: React.FC = () => {
             value={name}
             onChangeText={setName}
             mode="outlined"
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.colors.surface }]}
             placeholder="Ex: Unha em gel"
             autoCapitalize="words"
             maxLength={50}
@@ -121,13 +122,13 @@ export const CreateServiceScreen: React.FC = () => {
             value={duration}
             onChangeText={text => setDuration(text.replace(/[^0-9]/g, ''))}
             mode="outlined"
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.colors.surface }]}
             placeholder="Ex: 60"
             keyboardType="numeric"
             maxLength={3}
           />
 
-          <Text style={styles.durationLabel}>Duração rápida:</Text>
+          <Text style={[styles.durationLabel, { color: theme.colors.onSurfaceVariant }]}>Duração rápida:</Text>
           <View style={styles.durationOptions}>
             {durationOptions.map(min => (
               <BigButton
@@ -177,11 +178,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.text,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 4,
   },
   form: {
@@ -189,11 +188,9 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
-    backgroundColor: COLORS.surface,
   },
   durationLabel: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 8,
     marginBottom: 8,
   },

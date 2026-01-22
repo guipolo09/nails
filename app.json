@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Nails",
-    "slug": "nails-app",
+    "name": "Nails Calendar",
+    "slug": "nails-calendar-app",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -42,6 +42,11 @@
           "calendarPermission": "Este app precisa de acesso ao calendário para salvar seus agendamentos."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d3a89413-7d0a-4a6b-93b8-be15fd033211"
+      }
+    }
   }
 }

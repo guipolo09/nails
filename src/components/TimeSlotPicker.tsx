@@ -4,8 +4,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Chip, Text } from 'react-native-paper';
-import { COLORS } from '../utils/constants';
+import { Chip, Text, useTheme } from 'react-native-paper';
 import type { TimeSlot } from '../types';
 
 interface TimeSlotPickerProps {
@@ -19,13 +18,14 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
   selectedTime,
   onSelectTime,
 }) => {
+  const theme = useTheme();
   const availableSlots = slots.filter(s => s.available);
   const unavailableCount = slots.length - availableSlots.length;
 
   if (availableSlots.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>
+        <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
           Nenhum horário disponível nesta data
         </Text>
       </View>
@@ -41,7 +41,7 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
   return (
     <View style={styles.container}>
       {unavailableCount > 0 && (
-        <Text style={styles.info}>
+        <Text style={[styles.info, { color: theme.colors.onSurfaceVariant }]}>
           {unavailableCount} horário(s) já ocupado(s)
         </Text>
       )}
@@ -57,12 +57,12 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
                 onPress={() => onSelectTime(item.time)}
                 style={[
                   styles.chip,
-                  isSelected && styles.chipSelected,
+                  { backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface },
                 ]}
-                textStyle={[
-                  styles.chipText,
-                  isSelected && styles.chipTextSelected,
-                ]}
+                textStyle={{
+                  color: isSelected ? '#FFFFFF' : theme.colors.onSurface,
+                  fontSize: 14,
+                }}
                 showSelectedOverlay={false}
               >
                 {item.time}
@@ -81,7 +81,6 @@ const styles = StyleSheet.create({
   },
   info: {
     fontSize: 12,
-    color: COLORS.textSecondary,
     marginBottom: 12,
     fontStyle: 'italic',
   },
@@ -92,17 +91,6 @@ const styles = StyleSheet.create({
   chip: {
     marginRight: 8,
     marginBottom: 4,
-    backgroundColor: COLORS.surface,
-  },
-  chipSelected: {
-    backgroundColor: COLORS.primary,
-  },
-  chipText: {
-    fontSize: 14,
-    color: COLORS.text,
-  },
-  chipTextSelected: {
-    color: '#FFFFFF',
   },
   emptyContainer: {
     padding: 20,
@@ -110,7 +98,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     textAlign: 'center',
   },
 });

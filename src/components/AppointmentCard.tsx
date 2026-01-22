@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
   },
   cardPast: {
     opacity: 0.6,
+    
   },
   content: {
     flexDirection: 'row',

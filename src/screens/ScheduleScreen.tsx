@@ -4,7 +4,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { StyleSheet, View, SectionList } from 'react-native';
-import { FAB, Snackbar, Text, SegmentedButtons } from 'react-native-paper';
+import { FAB, Snackbar, Text, SegmentedButtons, useTheme } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import dayjs from 'dayjs';
@@ -16,7 +16,6 @@ import {
   ConfirmDialog,
 } from '../components';
 import { useAppointments } from '../hooks';
-import { COLORS } from '../utils/constants';
 import { formatDateLong } from '../utils/helpers';
 import type { RootStackParamList, Appointment } from '../types';
 
@@ -32,6 +31,7 @@ interface AppointmentSection {
 export const ScheduleScreen: React.FC = () => {
   const navigation = useNavigation<ScheduleNavigationProp>();
   const { appointments, loading, deleteAppointment, refresh } = useAppointments();
+  const theme = useTheme();
 
   // Recarrega os dados quando a tela ganha foco
   useFocusEffect(
@@ -112,13 +112,15 @@ export const ScheduleScreen: React.FC = () => {
   return (
     <ScreenContainer padding={false} scroll={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Agendamentos</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+          Agendamentos
+        </Text>
+        <Text style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
           {filteredAppointments.length} agendamento(s)
         </Text>
       </View>
 
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer]}>
         <SegmentedButtons
           value={filter}
           onValueChange={value => setFilter(value as FilterType)}
@@ -127,7 +129,7 @@ export const ScheduleScreen: React.FC = () => {
             { value: 'upcoming', label: 'Próximos' },
             { value: 'all', label: 'Todos' },
           ]}
-          style={styles.segmentedButtons}
+          style={[styles.segmentedButtons, { backgroundColor: theme.colors.surface , borderRadius: 50}]}
         />
       </View>
 
@@ -147,7 +149,12 @@ export const ScheduleScreen: React.FC = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionHeader}>{section.title}</Text>
+            <Text style={[
+              styles.sectionHeader,
+              { color: theme.colors.primary, backgroundColor: theme.colors.background }
+            ]}>
+              {section.title}
+            </Text>
           )}
           renderItem={({ item }) => (
             <AppointmentCard
@@ -162,7 +169,7 @@ export const ScheduleScreen: React.FC = () => {
 
       <FAB
         icon="plus"
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         onPress={() => navigation.navigate('CreateSchedule')}
         color="#FFFFFF"
       />
@@ -198,11 +205,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.text,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
     marginTop: 4,
   },
   filterContainer: {
@@ -210,7 +215,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   segmentedButtons: {
-    backgroundColor: COLORS.surface,
+    // backgroundColor será aplicada dinamicamente
   },
   list: {
     padding: 20,
@@ -220,16 +225,13 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.primary,
     marginTop: 16,
     marginBottom: 8,
-    backgroundColor: COLORS.background,
   },
   fab: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    backgroundColor: COLORS.primary,
   },
   snackbar: {
     marginBottom: 80,

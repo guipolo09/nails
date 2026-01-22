@@ -4,8 +4,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Text, Icon } from 'react-native-paper';
-import { COLORS } from '../utils/constants';
+import { Text, Icon, useTheme } from 'react-native-paper';
 
 interface EmptyStateProps {
   icon: string;
@@ -18,12 +17,18 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
 }) => {
+  const theme = useTheme();
+
   return (
     <View style={styles.container}>
-      <Icon source={icon} size={80} color={COLORS.textSecondary} />
-      <Text style={styles.title}>{title}</Text>
+      <Icon source={icon} size={80} color={theme.colors.onSurfaceVariant} />
+      <Text style={[styles.title, { color: theme.colors.onSurfaceVariant }]}>
+        {title}
+      </Text>
       {description && (
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.description, { color: theme.colors.onSurfaceVariant }]}>
+          {description}
+        </Text>
       )}
     </View>
   );
@@ -39,13 +44,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: COLORS.textSecondary,
     marginTop: 16,
     textAlign: 'center',
   },
   description: {
     fontSize: 16,
-    color: COLORS.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
