@@ -1,48 +1,43 @@
 {
   "expo": {
     "name": "Nails Calendar",
-    "slug": "nails-calendar-app",
+    "slug": "nails-app",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#E91E63"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nails.app",
+      "bundleIdentifier": "com.guilhermepolo09.nailsapp",
       "infoPlist": {
-        "NSCalendarsUsageDescription": "Este app precisa de acesso ao calendário para salvar seus agendamentos no Google Agenda.",
-        "NSCalendarsFullAccessUsageDescription": "Este app precisa de acesso ao calendário para salvar seus agendamentos no Google Agenda."
+        "NSCalendarsUsageDescription": "Este app precisa acessar seu calendário para criar lembretes de agendamentos.",
+        "NSRemindersUsageDescription": "Este app precisa acessar lembretes para notificar sobre seus agendamentos."
       }
     },
     "android": {
+      "package": "com.guilhermepolo09.nailsapp",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E91E63"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.nails.app",
       "permissions": [
-        "android.permission.READ_CALENDAR",
-        "android.permission.WRITE_CALENDAR"
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
-    "plugins": [
-      [
-        "expo-calendar",
-        {
-          "calendarPermission": "Este app precisa de acesso ao calendário para salvar seus agendamentos."
-        }
-      ]
-    ],
     "extra": {
       "eas": {
         "projectId": "d3a89413-7d0a-4a6b-93b8-be15fd033211"
