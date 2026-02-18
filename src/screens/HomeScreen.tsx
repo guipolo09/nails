@@ -31,6 +31,13 @@ export const HomeScreen: React.FC = () => {
         />
 
         <BigButton
+          label="Clientes"
+          icon="account-heart-outline"
+          onPress={() => navigation.navigate('Clients')}
+          mode="outlined"
+        />
+
+        <BigButton
           label="Serviços"
           icon="nail"
           onPress={() => navigation.navigate('Services')}

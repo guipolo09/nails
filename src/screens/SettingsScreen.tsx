@@ -15,16 +15,34 @@ import {
   Portal,
   Dialog,
   Chip,
+  Menu,
 } from 'react-native-paper';
 import { ScreenContainer, LoadingState } from '../components';
 import { useSettings } from '../hooks/useSettings';
 import { useTheme } from '../context/ThemeContext';
-import type { TimeSlotInterval } from '../types';
+import type { TimeSlotInterval, ReminderOffset } from '../types';
+import {
+  scheduleDailyMorningReminder,
+  cancelDailyMorningReminder,
+  scheduleDailyEveningReminder,
+  cancelDailyEveningReminder,
+  requestNotificationPermissions,
+  hasNotificationPermissions,
+  getReminderOffsetLabel,
+} from '../services/notificationService';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from 'dayjs';
 
+const REMINDER_OFFSET_OPTIONS: { value: ReminderOffset; label: string }[] = [
+  { value: 5,           label: '5 minutos antes' },
+  { value: 30,          label: '30 minutos antes' },
+  { value: 60,          label: '1 hora antes' },
+  { value: 120,         label: '2 horas antes' },
+  { value: 'day_before', label: 'No dia anterior (às 9h)' },
+];
+
 export const SettingsScreen: React.FC = () => {
-  const { settings, loading, updateBusinessHours, updateTimeSlotInterval, addHoliday, removeHoliday } = useSettings();
+  const { settings, loading, updateBusinessHours, updateTimeSlotInterval, addHoliday, removeHoliday, updateReminderSettings } = useSettings();
   const { themeMode, toggleTheme } = useTheme();
 
   // Estados locais para diálogos
@@ -32,6 +50,9 @@ export const SettingsScreen: React.FC = () => {
   const [showEndTimeDialog, setShowEndTimeDialog] = useState(false);
   const [showHolidayPicker, setShowHolidayPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Estado do menu de seleção de antecedência
+  const [showOffsetMenu, setShowOffsetMenu] = useState(false);
 
   // Estados para o time picker
   const [tempStartTime, setTempStartTime] = useState(new Date());
@@ -149,6 +170,58 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const ensureNotificationPermission = async (): Promise<boolean> => {
+    let hasPermission = await hasNotificationPermissions();
+    if (!hasPermission) {
+      hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        Alert.alert(
+          'Permissão necessária',
+          'Para receber lembretes, autorize as notificações nas configurações do seu dispositivo.'
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleToggleAppointmentReminders = async (enabled: boolean) => {
+    if (enabled) {
+      const ok = await ensureNotificationPermission();
+      if (!ok) return;
+    }
+    await updateReminderSettings({ appointmentRemindersEnabled: enabled });
+  };
+
+  const handleSelectReminderOffset = async (offset: ReminderOffset) => {
+    setShowOffsetMenu(false);
+    await updateReminderSettings({ reminderOffset: offset });
+  };
+
+  const handleToggleMorningReminder = async (enabled: boolean) => {
+    if (!settings) return;
+    if (enabled) {
+      const ok = await ensureNotificationPermission();
+      if (!ok) return;
+      await scheduleDailyMorningReminder(settings.businessHours.start);
+    } else {
+      await cancelDailyMorningReminder();
+    }
+    await updateReminderSettings({ dailyMorningReminderEnabled: enabled });
+  };
+
+  const handleToggleEveningReminder = async (enabled: boolean) => {
+    if (!settings) return;
+    if (enabled) {
+      const ok = await ensureNotificationPermission();
+      if (!ok) return;
+      await scheduleDailyEveningReminder(settings.businessHours.end);
+    } else {
+      await cancelDailyEveningReminder();
+    }
+    await updateReminderSettings({ dailyEveningReminderEnabled: enabled });
+  };
+
   const formatHour = (hour: number) => `${hour.toString().padStart(2, '0')}:00`;
 
   return (
@@ -209,6 +282,89 @@ export const SettingsScreen: React.FC = () => {
               <Switch
                 value={themeMode === 'dark'}
                 onValueChange={toggleTheme}
+              />
+            )}
+          />
+        </List.Section>
+
+        <Divider />
+
+        {/* Lembretes */}
+        <List.Section>
+          <List.Subheader>Lembretes</List.Subheader>
+
+          {/* Lembrete por agendamento */}
+          <List.Item
+            title="Lembrete de Agendamento"
+            description="Receba um aviso antes de cada agendamento"
+            left={props => <List.Icon {...props} icon="bell-outline" />}
+            right={() => (
+              <Switch
+                value={settings.reminderSettings.appointmentRemindersEnabled}
+                onValueChange={handleToggleAppointmentReminders}
+              />
+            )}
+          />
+
+          {/* Seleção de antecedência (visível apenas quando habilitado) */}
+          {settings.reminderSettings.appointmentRemindersEnabled && (
+            <View style={styles.offsetMenuContainer}>
+              <Text style={styles.offsetLabel}>Antecedência do lembrete</Text>
+              <Menu
+                visible={showOffsetMenu}
+                onDismiss={() => setShowOffsetMenu(false)}
+                anchor={
+                  <Button
+                    mode="outlined"
+                    icon="chevron-down"
+                    onPress={() => setShowOffsetMenu(true)}
+                    style={styles.offsetButton}
+                    contentStyle={styles.offsetButtonContent}
+                  >
+                    {getReminderOffsetLabel(settings.reminderSettings.reminderOffset)}
+                  </Button>
+                }
+              >
+                {REMINDER_OFFSET_OPTIONS.map(option => (
+                  <Menu.Item
+                    key={String(option.value)}
+                    title={option.label}
+                    onPress={() => handleSelectReminderOffset(option.value)}
+                    trailingIcon={
+                      settings.reminderSettings.reminderOffset === option.value
+                        ? 'check'
+                        : undefined
+                    }
+                  />
+                ))}
+              </Menu>
+            </View>
+          )}
+
+          <Divider style={styles.innerDivider} />
+
+          {/* Lembrete matinal diário */}
+          <List.Item
+            title="Lembrete Matinal Diário"
+            description={`Resumo dos agendamentos de hoje às ${formatHour(Math.max(0, settings.businessHours.start - 1))}`}
+            left={props => <List.Icon {...props} icon="weather-sunny" />}
+            right={() => (
+              <Switch
+                value={settings.reminderSettings.dailyMorningReminderEnabled}
+                onValueChange={handleToggleMorningReminder}
+              />
+            )}
+          />
+
+          {/* Lembrete noturno diário */}
+          <List.Item
+            title="Lembrete Final do Dia"
+            description={`Resumo dos agendamentos de amanhã às ${formatHour(Math.min(23, settings.businessHours.end + 1))}`}
+            left={props => <List.Icon {...props} icon="weather-night" />}
+            right={() => (
+              <Switch
+                value={settings.reminderSettings.dailyEveningReminderEnabled}
+                onValueChange={handleToggleEveningReminder}
               />
             )}
           />
@@ -429,5 +585,24 @@ const styles = StyleSheet.create({
   dialogText: {
     marginBottom: 16,
     fontSize: 16,
+  },
+  offsetMenuContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  offsetLabel: {
+    fontSize: 12,
+    color: '#757575',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  offsetButton: {
+    alignSelf: 'flex-start',
+  },
+  offsetButtonContent: {
+    flexDirection: 'row-reverse',
+  },
+  innerDivider: {
+    marginVertical: 4,
   },
 });

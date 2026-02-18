@@ -1,11 +1,20 @@
 // ============================================
 // TELA DE CRIAÇÃO DE AGENDAMENTO
-// Fluxo: Nome -> Serviço -> Data -> Horário
+// Fluxo: Cliente -> Serviço -> Data -> Horário -> Confirmar
 // ============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Text, Snackbar, Divider, TextInput, useTheme } from 'react-native-paper';
+import { StyleSheet, View, FlatList, TouchableOpacity } from 'react-native';
+import {
+  Text,
+  Snackbar,
+  Divider,
+  TextInput,
+  Switch,
+  SegmentedButtons,
+  Chip,
+  useTheme,
+} from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import dayjs from 'dayjs';
@@ -18,35 +27,73 @@ import {
   EmptyState,
 } from '../components';
 import { useServices, useAppointments, useSettings } from '../hooks';
+import { clientRepository } from '../services/clientRepository';
 import { COLORS } from '../utils/constants';
 import { generateTimeSlotsWithSettings, formatDateLong, calculateEndTime } from '../utils/helpers';
-import type { RootStackParamList, Service, Appointment } from '../types';
+import { generateId } from '../utils/helpers';
+import type { RootStackParamList, Service, Appointment, Client, RecurrenceInterval, RecurrenceOptions } from '../types';
 
 type CreateScheduleNavigationProp = StackNavigationProp<RootStackParamList, 'CreateSchedule'>;
 
-type Step = 'name' | 'service' | 'date' | 'time' | 'confirm';
+type Step = 'client' | 'service' | 'date' | 'time' | 'confirm';
+
+const RECURRENCE_OPTIONS: { value: RecurrenceInterval; label: string }[] = [
+  { value: 'weekly',   label: 'Semanal' },
+  { value: 'biweekly', label: 'Quinzenal' },
+  { value: '3weeks',   label: '3 Semanas' },
+  { value: 'monthly',  label: 'Mensal' },
+];
+
+const RECURRENCE_COUNTS = [2, 3, 4, 6];
+
+const RECURRENCE_DAYS: Record<RecurrenceInterval, number> = {
+  weekly:   7,
+  biweekly: 14,
+  '3weeks': 21,
+  monthly:  28,
+};
 
 export const CreateScheduleScreen: React.FC = () => {
   const navigation = useNavigation<CreateScheduleNavigationProp>();
   const { services, loading: loadingServices } = useServices();
-  const { createAppointment, getAppointmentsByDate } = useAppointments();
+  const { createAppointment } = useAppointments();
   const { settings } = useSettings();
   const theme = useTheme();
 
-  // Estados do fluxo
-  const [currentStep, setCurrentStep] = useState<Step>('name');
+  // Fluxo
+  const [currentStep, setCurrentStep] = useState<Step>('client');
+
+  // Dados do agendamento
   const [clientName, setClientName] = useState('');
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  // Estados de UI
+  // Recorrência
+  const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<RecurrenceInterval>('biweekly');
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
+
+  // UI
+  const [clientSuggestions, setClientSuggestions] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
 
-  // Gerar próximos 7 dias (incluindo sábados e domingos)
+  const { getAppointmentsByDate } = useAppointments();
+
+  // Busca clientes ao digitar
+  useEffect(() => {
+    if (clientName.trim().length >= 1) {
+      setClientSuggestions(clientRepository.search(clientName));
+    } else {
+      setClientSuggestions(clientRepository.getAll().slice(0, 5));
+    }
+  }, [clientName]);
+
+  // Próximos 7 dias disponíveis
   const availableDates = useMemo(() => {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -63,14 +110,14 @@ export const CreateScheduleScreen: React.FC = () => {
     return dates;
   }, [settings]);
 
-  // Carregar agendamentos do dia selecionado
+  // Carrega agendamentos do dia
   useEffect(() => {
     if (selectedDate) {
       getAppointmentsByDate(selectedDate).then(setDayAppointments);
     }
   }, [selectedDate, getAppointmentsByDate]);
 
-  // Gerar slots de horário (com configurações dinâmicas)
+  // Slots de horário
   const timeSlots = useMemo(() => {
     if (!selectedDate || !selectedService) return [];
     return generateTimeSlotsWithSettings(
@@ -81,17 +128,34 @@ export const CreateScheduleScreen: React.FC = () => {
     );
   }, [selectedDate, selectedService, dayAppointments, settings]);
 
+  // Datas que serão geradas pela recorrência
+  const recurrenceDates = useMemo(() => {
+    if (!selectedDate || !recurrenceEnabled) return [];
+    const days = RECURRENCE_DAYS[recurrenceInterval];
+    return Array.from({ length: recurrenceCount }, (_, i) =>
+      dayjs(selectedDate).add((i + 1) * days, 'day').format('YYYY-MM-DD')
+    );
+  }, [selectedDate, recurrenceEnabled, recurrenceInterval, recurrenceCount]);
+
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
     setSnackbarVisible(true);
   };
 
-  // Handlers de navegação do fluxo
-  const handleNameNext = () => {
+  // ---- Handlers de navegação ----
+
+  const handleClientNext = () => {
     if (!clientName.trim()) {
-      showSnackbar('Digite o nome do cliente');
+      showSnackbar('Digite ou selecione uma cliente');
       return;
     }
+    setCurrentStep('service');
+  };
+
+  const handleSelectClient = (client: Client) => {
+    setSelectedClient(client);
+    setClientName(client.name);
+    setClientSuggestions([]);
     setCurrentStep('service');
   };
 
@@ -114,7 +178,7 @@ export const CreateScheduleScreen: React.FC = () => {
   const handleBack = () => {
     switch (currentStep) {
       case 'service':
-        setCurrentStep('name');
+        setCurrentStep('client');
         break;
       case 'date':
         setCurrentStep('service');
@@ -139,95 +203,143 @@ export const CreateScheduleScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const result = await createAppointment({
-        clientName: clientName.trim(),
-        serviceId: selectedService.id,
-        date: selectedDate,
-        startTime: selectedTime,
-      });
+      const groupId = recurrenceEnabled ? generateId() : undefined;
+      const allDates = [selectedDate, ...recurrenceDates];
+      const datesToCreate = recurrenceEnabled ? allDates : [selectedDate];
 
-      if (result.success) {
-        showSnackbar(result.message);
+      let successCount = 0;
+      let lastMessage = '';
+
+      for (const date of datesToCreate) {
+        const result = await createAppointment({
+          clientName: clientName.trim(),
+          clientId: selectedClient?.id,
+          serviceId: selectedService.id,
+          date,
+          startTime: selectedTime,
+          recurrenceGroupId: groupId,
+        });
+        if (result.success) {
+          successCount++;
+          lastMessage = result.message;
+        }
+      }
+
+      if (successCount > 0) {
+        const msg = recurrenceEnabled
+          ? `${successCount} agendamento(s) criado(s) com sucesso!`
+          : lastMessage;
+        showSnackbar(msg);
         setTimeout(() => navigation.goBack(), 1500);
       } else {
-        showSnackbar(result.message);
+        showSnackbar('Não foi possível criar os agendamentos');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Renderização condicional por etapa
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      <View style={[
-        styles.step,
-        currentStep === 'name' && styles.stepActive,
-        currentStep !== 'name' && styles.stepCompleted,
-      ]}>
-        <Text style={styles.stepText}>1</Text>
-      </View>
-      <View style={styles.stepLine} />
-      <View style={[
-        styles.step,
-        currentStep === 'service' && styles.stepActive,
-        (currentStep === 'date' || currentStep === 'time' || currentStep === 'confirm') && styles.stepCompleted,
-      ]}>
-        <Text style={styles.stepText}>2</Text>
-      </View>
-      <View style={styles.stepLine} />
-      <View style={[
-        styles.step,
-        currentStep === 'date' && styles.stepActive,
-        (currentStep === 'time' || currentStep === 'confirm') && styles.stepCompleted,
-      ]}>
-        <Text style={styles.stepText}>3</Text>
-      </View>
-      <View style={styles.stepLine} />
-      <View style={[
-        styles.step,
-        currentStep === 'time' && styles.stepActive,
-        currentStep === 'confirm' && styles.stepCompleted,
-      ]}>
-        <Text style={styles.stepText}>4</Text>
-      </View>
-    </View>
-  );
+  // ---- Indicador de etapas ----
 
-  const renderNameStep = () => (
+  const renderStepIndicator = () => {
+    const steps: Step[] = ['client', 'service', 'date', 'time', 'confirm'];
+    const currentIndex = steps.indexOf(currentStep);
+    return (
+      <View style={styles.stepIndicator}>
+        {steps.map((step, index) => (
+          <React.Fragment key={step}>
+            <View style={[
+              styles.step,
+              index === currentIndex && styles.stepActive,
+              index < currentIndex && styles.stepCompleted,
+            ]}>
+              <Text style={styles.stepText}>{index + 1}</Text>
+            </View>
+            {index < steps.length - 1 && <View style={styles.stepLine} />}
+          </React.Fragment>
+        ))}
+      </View>
+    );
+  };
+
+  // ---- Etapa 1: Seleção de cliente ----
+
+  const renderClientStep = () => (
     <>
       <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
-        Nome do cliente
+        Cliente
       </Text>
       <TextInput
-        label="Digite o nome"
+        label="Nome da cliente"
         value={clientName}
-        onChangeText={setClientName}
+        onChangeText={text => {
+          setClientName(text);
+          if (selectedClient && text !== selectedClient.name) {
+            setSelectedClient(null);
+          }
+        }}
         mode="outlined"
         style={[styles.input, { backgroundColor: theme.colors.surface }]}
         autoCapitalize="words"
-        maxLength={50}
+        maxLength={60}
         autoFocus
+        right={selectedClient ? <TextInput.Icon icon="check-circle" color={theme.colors.primary} /> : undefined}
       />
+
+      {clientSuggestions.length > 0 && (
+        <View style={[styles.suggestionsBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
+          <FlatList
+            data={clientSuggestions}
+            keyExtractor={item => item.id}
+            scrollEnabled={false}
+            ItemSeparatorComponent={() => <Divider />}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionItem}
+                onPress={() => handleSelectClient(item)}
+              >
+                <View style={styles.suggestionLeft}>
+                  <Text style={[styles.suggestionName, { color: theme.colors.onSurface }]}>
+                    {item.name}
+                  </Text>
+                  {item.phone ? (
+                    <Text style={[styles.suggestionDetail, { color: theme.colors.onSurfaceVariant }]}>
+                      {item.phone}
+                    </Text>
+                  ) : null}
+                </View>
+                {item.tier === 'premium' && (
+                  <Chip
+                    compact
+                    style={[styles.premiumChip, { backgroundColor: theme.colors.primaryContainer }]}
+                    textStyle={[styles.premiumChipText, { color: theme.colors.primary }]}
+                  >
+                    Premium
+                  </Chip>
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
+
       <BigButton
         label="Continuar"
         icon="arrow-right"
-        onPress={handleNameNext}
+        onPress={handleClientNext}
       />
     </>
   );
 
+  // ---- Etapa 2: Serviço ----
+
   const renderServiceStep = () => (
     <>
       <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
-        Selecione o serviço
+        Serviço
       </Text>
       {services.length === 0 ? (
-        <EmptyState
-          icon="nail"
-          title="Nenhum serviço"
-          description="Cadastre um serviço primeiro"
-        />
+        <EmptyState icon="nail" title="Nenhum serviço" description="Cadastre um serviço primeiro" />
       ) : (
         services.map(item => (
           <ServiceCard
@@ -242,13 +354,15 @@ export const CreateScheduleScreen: React.FC = () => {
     </>
   );
 
+  // ---- Etapa 3: Data ----
+
   const renderDateStep = () => (
     <>
       <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
-        Selecione a data
+        Data
       </Text>
       <Text style={[styles.selectedInfo, { color: theme.colors.primary }]}>
-        Serviço: {selectedService?.name}
+        {selectedService?.name}
       </Text>
       {availableDates.map(item => (
         <View key={item.value}>
@@ -268,39 +382,30 @@ export const CreateScheduleScreen: React.FC = () => {
     </>
   );
 
+  // ---- Etapa 4: Horário ----
+
   const renderTimeStep = () => {
     const isHoliday = settings?.holidays.includes(selectedDate!) || false;
-
     return (
       <>
         <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
-          Selecione o horário
+          Horário
         </Text>
         <Text style={[styles.selectedInfo, { color: theme.colors.primary }]}>
-          {selectedService?.name} - {formatDateLong(selectedDate!)}
+          {selectedService?.name} · {formatDateLong(selectedDate!)}
         </Text>
         {isHoliday ? (
-          <EmptyState
-            icon="calendar-remove"
-            title="Feriado"
-            description="Não há atendimento neste dia"
-          />
+          <EmptyState icon="calendar-remove" title="Feriado" description="Não há atendimento neste dia" />
         ) : timeSlots.length === 0 ? (
-          <EmptyState
-            icon="clock-alert"
-            title="Sem horários"
-            description="Todos os horários estão ocupados"
-          />
+          <EmptyState icon="clock-alert" title="Sem horários" description="Todos os horários estão ocupados" />
         ) : (
-          <TimeSlotPicker
-            slots={timeSlots}
-            selectedTime={selectedTime}
-            onSelectTime={handleSelectTime}
-          />
+          <TimeSlotPicker slots={timeSlots} selectedTime={selectedTime} onSelectTime={handleSelectTime} />
         )}
       </>
     );
   };
+
+  // ---- Etapa 5: Confirmar ----
 
   const renderConfirmStep = () => {
     const endTime = selectedTime && selectedService
@@ -310,49 +415,95 @@ export const CreateScheduleScreen: React.FC = () => {
     return (
       <>
         <Text style={[styles.stepTitle, { color: theme.colors.onBackground }]}>
-          Confirmar agendamento
+          Confirmar
         </Text>
 
         <View style={[styles.confirmCard, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.confirmRow}>
-            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
-              Cliente
-            </Text>
-            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
-              {clientName}
-            </Text>
+          <ConfirmRow label="Cliente" value={clientName} premium={selectedClient?.tier === 'premium'} />
+          <Divider style={{ backgroundColor: theme.colors.outlineVariant }} />
+          <ConfirmRow label="Serviço" value={selectedService?.name ?? ''} />
+          <Divider style={{ backgroundColor: theme.colors.outlineVariant }} />
+          <ConfirmRow label="Data" value={formatDateLong(selectedDate!)} />
+          <Divider style={{ backgroundColor: theme.colors.outlineVariant }} />
+          <ConfirmRow label="Horário" value={`${selectedTime} às ${endTime}`} />
+        </View>
+
+        {/* Opção de recorrência */}
+        <View style={[styles.recurrenceCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
+          <View style={styles.recurrenceToggleRow}>
+            <View style={styles.recurrenceToggleLeft}>
+              <Text style={[styles.recurrenceToggleTitle, { color: theme.colors.onSurface }]}>
+                Repetir agendamento
+              </Text>
+              <Text style={[styles.recurrenceToggleSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+                Criar série de agendamentos automáticos
+              </Text>
+            </View>
+            <Switch
+              value={recurrenceEnabled}
+              onValueChange={setRecurrenceEnabled}
+            />
           </View>
-          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
-          <View style={styles.confirmRow}>
-            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
-              Serviço
-            </Text>
-            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
-              {selectedService?.name}
-            </Text>
-          </View>
-          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
-          <View style={styles.confirmRow}>
-            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
-              Data
-            </Text>
-            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
-              {formatDateLong(selectedDate!)}
-            </Text>
-          </View>
-          <Divider style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
-          <View style={styles.confirmRow}>
-            <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>
-              Horário
-            </Text>
-            <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>
-              {selectedTime} às {endTime}
-            </Text>
-          </View>
+
+          {recurrenceEnabled && (
+            <>
+              <Divider style={{ backgroundColor: theme.colors.outlineVariant, marginVertical: 12 }} />
+
+              <Text style={[styles.recurrenceLabel, { color: theme.colors.onSurfaceVariant }]}>
+                Frequência
+              </Text>
+              <SegmentedButtons
+                value={recurrenceInterval}
+                onValueChange={v => setRecurrenceInterval(v as RecurrenceInterval)}
+                buttons={RECURRENCE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                style={styles.segmented}
+              />
+
+              <Text style={[styles.recurrenceLabel, { color: theme.colors.onSurfaceVariant }]}>
+                Repetições (além do 1º)
+              </Text>
+              <View style={styles.countRow}>
+                {RECURRENCE_COUNTS.map(n => (
+                  <TouchableOpacity
+                    key={n}
+                    style={[
+                      styles.countChip,
+                      {
+                        backgroundColor: recurrenceCount === n
+                          ? theme.colors.primary
+                          : theme.colors.surfaceVariant,
+                        borderColor: recurrenceCount === n
+                          ? theme.colors.primary
+                          : theme.colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={() => setRecurrenceCount(n)}
+                  >
+                    <Text style={{
+                      color: recurrenceCount === n ? '#FFFFFF' : theme.colors.onSurfaceVariant,
+                      fontWeight: '700',
+                      fontSize: 14,
+                    }}>
+                      {n}x
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.recurrenceSummary, { color: theme.colors.primary }]}>
+                {recurrenceCount + 1} agendamentos no total:{'\n'}
+                {[selectedDate!, ...recurrenceDates]
+                  .map(d => dayjs(d).format('DD/MM'))
+                  .join(' · ')}
+              </Text>
+            </>
+          )}
         </View>
 
         <BigButton
-          label="Confirmar Agendamento"
+          label={recurrenceEnabled
+            ? `Confirmar ${recurrenceCount + 1} Agendamentos`
+            : 'Confirmar Agendamento'}
           icon="check"
           onPress={handleConfirm}
           loading={loading}
@@ -363,48 +514,52 @@ export const CreateScheduleScreen: React.FC = () => {
   };
 
   if (loadingServices) {
-    return (
-      <ScreenContainer>
-        <LoadingState />
-      </ScreenContainer>
-    );
+    return <ScreenContainer><LoadingState /></ScreenContainer>;
   }
 
   return (
     <ScreenContainer>
       {renderStepIndicator()}
-
       <View style={styles.content}>
-        {currentStep === 'name' && renderNameStep()}
+        {currentStep === 'client'  && renderClientStep()}
         {currentStep === 'service' && renderServiceStep()}
-        {currentStep === 'date' && renderDateStep()}
-        {currentStep === 'time' && renderTimeStep()}
+        {currentStep === 'date'    && renderDateStep()}
+        {currentStep === 'time'    && renderTimeStep()}
         {currentStep === 'confirm' && renderConfirmStep()}
       </View>
 
-      {currentStep === 'name' ? (
-        <BigButton
-          label="Cancelar"
-          mode="text"
-          onPress={() => navigation.goBack()}
-        />
+      {currentStep === 'client' ? (
+        <BigButton label="Cancelar" mode="text" onPress={() => navigation.goBack()} />
       ) : (
-        <BigButton
-          label="Voltar"
-          mode="text"
-          icon="arrow-left"
-          onPress={handleBack}
-        />
+        <BigButton label="Voltar" mode="text" icon="arrow-left" onPress={handleBack} />
       )}
 
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => setSnackbarVisible(false)}
-        duration={3000}
-      >
+      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>
         {snackbarMessage}
       </Snackbar>
     </ScreenContainer>
+  );
+};
+
+// ---- Sub-componente linha de confirmação ----
+const ConfirmRow: React.FC<{ label: string; value: string; premium?: boolean }> = ({ label, value, premium }) => {
+  const theme = useTheme();
+  return (
+    <View style={styles.confirmRow}>
+      <Text style={[styles.confirmLabel, { color: theme.colors.onSurfaceVariant }]}>{label}</Text>
+      <View style={styles.confirmValueRow}>
+        {premium && (
+          <Chip
+            compact
+            style={[styles.premiumChip, { backgroundColor: theme.colors.primaryContainer }]}
+            textStyle={[styles.premiumChipText, { color: theme.colors.primary }]}
+          >
+            Premium
+          </Chip>
+        )}
+        <Text style={[styles.confirmValue, { color: theme.colors.onSurface }]}>{value}</Text>
+      </View>
+    </View>
   );
 };
 
@@ -416,75 +571,94 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   step: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepActive: {
-    backgroundColor: COLORS.primary,
+  stepActive: { backgroundColor: COLORS.primary },
+  stepCompleted: { backgroundColor: COLORS.success },
+  stepText: { color: '#FFFFFF', fontWeight: '600', fontSize: 12 },
+  stepLine: { width: 24, height: 2, backgroundColor: COLORS.border, marginHorizontal: 3 },
+  content: { flex: 1 },
+  stepTitle: { fontSize: 22, fontWeight: '700', marginBottom: 16 },
+  input: { marginBottom: 8 },
+  selectedInfo: { fontSize: 14, marginBottom: 16, fontWeight: '500' },
+
+  // Sugestões de clientes
+  suggestionsBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: 'hidden',
   },
-  stepCompleted: {
-    backgroundColor: COLORS.success,
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  stepText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  stepLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: COLORS.border,
-    marginHorizontal: 4,
-  },
-  content: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  input: {
-    marginBottom: 16,
-  },
-  selectedInfo: {
-    fontSize: 14,
-    marginBottom: 16,
-    fontWeight: '500',
-  },
+  suggestionLeft: { flex: 1 },
+  suggestionName: { fontSize: 15, fontWeight: '600' },
+  suggestionDetail: { fontSize: 12, marginTop: 1 },
+  premiumChip: { height: 22, justifyContent: 'center', marginLeft: 8 },
+  premiumChipText: { fontSize: 9, fontWeight: '700', lineHeight: 11 },
+
+  holidayText: { fontSize: 12, textAlign: 'center', marginTop: -8, marginBottom: 8 },
+
+  // Confirm
   confirmCard: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
   },
   confirmRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
-  confirmLabel: {
-    fontSize: 14,
+  confirmValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  confirmLabel: { fontSize: 13 },
+  confirmValue: { fontSize: 15, fontWeight: '600' },
+
+  // Recorrência
+  recurrenceCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
   },
-  confirmValue: {
-    fontSize: 16,
-    fontWeight: '600',
+  recurrenceToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  divider: {
-    // backgroundColor será aplicada dinamicamente
+  recurrenceToggleLeft: { flex: 1, marginRight: 12 },
+  recurrenceToggleTitle: { fontSize: 15, fontWeight: '600' },
+  recurrenceToggleSubtitle: { fontSize: 12, marginTop: 2 },
+  recurrenceLabel: { fontSize: 12, marginBottom: 8, marginTop: 4 },
+  segmented: { marginBottom: 12 },
+  countRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  countChip: {
+    width: 52,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  holidayText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: -8,
-    marginBottom: 8,
+  recurrenceSummary: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 20,
   },
 });

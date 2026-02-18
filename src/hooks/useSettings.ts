@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { settingsRepository } from '../services/settingsRepository';
-import type { AppSettings, UpdateSettingsDTO, TimeSlotInterval, ThemeMode } from '../types';
+import type { AppSettings, UpdateSettingsDTO, TimeSlotInterval, ThemeMode, ReminderSettings } from '../types';
 
 /**
  * Hook customizado para gerenciar configurações do sistema
@@ -117,6 +117,22 @@ export const useSettings = () => {
   }, [settings]);
 
   /**
+   * Atualiza configurações de lembretes
+   */
+  const updateReminderSettings = useCallback(async (updates: Partial<ReminderSettings>) => {
+    try {
+      setError(null);
+      const updated = await settingsRepository.updateReminderSettings(updates);
+      setSettings(updated);
+      return { success: true, data: updated };
+    } catch (err) {
+      setError('Erro ao atualizar lembretes');
+      console.error(err);
+      return { success: false, error: 'Erro ao atualizar lembretes' };
+    }
+  }, []);
+
+  /**
    * Reseta configurações para padrão
    */
   const resetToDefaults = useCallback(async () => {
@@ -149,6 +165,7 @@ export const useSettings = () => {
     addHoliday,
     removeHoliday,
     isHoliday,
+    updateReminderSettings,
     resetToDefaults,
   };
 };

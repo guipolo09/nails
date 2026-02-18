@@ -5,7 +5,7 @@
 
 import { getItem, setItem } from '../storage/asyncStorage';
 import { STORAGE_KEYS } from '../utils/constants';
-import type { AppSettings, UpdateSettingsDTO } from '../types';
+import type { AppSettings, UpdateSettingsDTO, ReminderSettings } from '../types';
 
 /**
  * Configurações padrão do aplicativo
@@ -18,6 +18,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   timeSlotInterval: 30, // 30 minutos
   theme: 'light',
   holidays: [],
+  reminderSettings: {
+    appointmentRemindersEnabled: false,
+    reminderOffset: 30,
+    dailyMorningReminderEnabled: false,
+    dailyEveningReminderEnabled: false,
+  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -27,7 +33,8 @@ const DEFAULT_SETTINGS: AppSettings = {
  */
 export class LocalSettingsRepository {
   /**
-   * Obtém as configurações atuais ou retorna configurações padrão
+   * Obtém as configurações atuais ou retorna configurações padrão.
+   * Garante retrocompatibilidade com versões anteriores que não tinham reminderSettings.
    */
   async getSettings(): Promise<AppSettings> {
     try {
@@ -37,6 +44,16 @@ export class LocalSettingsRepository {
         // Se não existir configuração, salva as configurações padrão
         await setItem(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
         return DEFAULT_SETTINGS;
+      }
+
+      // Migração: adiciona reminderSettings se não existir
+      if (!settings.reminderSettings) {
+        const migrated: AppSettings = {
+          ...settings,
+          reminderSettings: DEFAULT_SETTINGS.reminderSettings,
+        };
+        await setItem(STORAGE_KEYS.SETTINGS, migrated);
+        return migrated;
       }
 
       return settings;
@@ -59,6 +76,9 @@ export class LocalSettingsRepository {
         businessHours: updates.businessHours
           ? { ...currentSettings.businessHours, ...updates.businessHours }
           : currentSettings.businessHours,
+        reminderSettings: updates.reminderSettings
+          ? { ...currentSettings.reminderSettings, ...updates.reminderSettings }
+          : currentSettings.reminderSettings,
         updatedAt: new Date().toISOString(),
       };
 
@@ -68,6 +88,13 @@ export class LocalSettingsRepository {
       console.error('Erro ao atualizar configurações:', error);
       throw error;
     }
+  }
+
+  /**
+   * Atualiza as configurações de lembretes
+   */
+  async updateReminderSettings(updates: Partial<ReminderSettings>): Promise<AppSettings> {
+    return this.updateSettings({ reminderSettings: updates });
   }
 
   /**

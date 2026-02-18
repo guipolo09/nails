@@ -12,6 +12,8 @@ import {
   ScheduleScreen,
   CreateScheduleScreen,
   SettingsScreen,
+  ClientsScreen,
+  CreateClientScreen,
 } from '../screens';
 import type { RootStackParamList } from '../types';
 
@@ -82,6 +84,22 @@ export const AppNavigator: React.FC = () => {
         options={{
           title: 'Configurações',
         }}
+      />
+
+      <Stack.Screen
+        name="Clients"
+        component={ClientsScreen}
+        options={{
+          title: 'Clientes',
+        }}
+      />
+
+      <Stack.Screen
+        name="CreateClient"
+        component={CreateClientScreen}
+        options={({ route }) => ({
+          title: route.params?.clientId ? 'Editar Cliente' : 'Nova Cliente',
+        })}
       />
     </Stack.Navigator>
   );

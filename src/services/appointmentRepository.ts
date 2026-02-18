@@ -14,6 +14,7 @@ import type { Appointment, CreateAppointmentDTO, Repository } from '../types';
  */
 export interface UpdateAppointmentDTO {
   calendarEventId?: string;
+  attendanceStatus?: 'confirmed' | 'missed';
 }
 
 /**
@@ -95,11 +96,13 @@ class LocalAppointmentRepository implements IAppointmentRepository {
     const newAppointment: Appointment = {
       id: generateId(),
       clientName: data.clientName.trim(),
+      clientId: data.clientId,
       serviceId: data.serviceId,
       serviceName: service.name,
       date: data.date,
       startTime: data.startTime,
       endTime,
+      recurrenceGroupId: data.recurrenceGroupId,
       createdAt: timestamp,
       updatedAt: timestamp,
     };

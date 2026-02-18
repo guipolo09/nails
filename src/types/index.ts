@@ -31,17 +31,57 @@ export interface UpdateServiceDTO {
 }
 
 /**
+ * Cliente cadastrada no salão
+ */
+export interface Client {
+  id: string;
+  name: string;
+  phone?: string;
+  notes?: string;
+  tier: 'regular' | 'premium';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateClientDTO {
+  name: string;
+  phone?: string;
+  notes?: string;
+  tier: 'regular' | 'premium';
+}
+
+export interface UpdateClientDTO {
+  name?: string;
+  phone?: string;
+  notes?: string;
+  tier?: 'regular' | 'premium';
+}
+
+/**
+ * Intervalo de recorrência de agendamentos
+ */
+export type RecurrenceInterval = 'weekly' | 'biweekly' | '3weeks' | 'monthly';
+
+export interface RecurrenceOptions {
+  interval: RecurrenceInterval;
+  count: number;
+}
+
+/**
  * Agendamento de um serviço
  */
 export interface Appointment {
   id: string;
   clientName: string;
+  clientId?: string; // vínculo com cliente cadastrada
   serviceId: string;
   serviceName: string;
   date: string; // ISO date string (YYYY-MM-DD)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   calendarEventId?: string; // ID do evento no Google Calendar
+  attendanceStatus?: 'confirmed' | 'missed'; // Status de presença da cliente
+  recurrenceGroupId?: string; // agrupa agendamentos recorrentes
   createdAt: string;
   updatedAt: string;
 }
@@ -51,9 +91,11 @@ export interface Appointment {
  */
 export interface CreateAppointmentDTO {
   clientName: string;
+  clientId?: string;
   serviceId: string;
   date: string;
   startTime: string;
+  recurrenceGroupId?: string;
 }
 
 /**
@@ -96,6 +138,21 @@ export type TimeSlotInterval = 15 | 30 | 45 | 60;
 export type ThemeMode = 'light' | 'dark';
 
 /**
+ * Antecedência do lembrete de agendamento (em minutos ou dia anterior)
+ */
+export type ReminderOffset = 5 | 30 | 60 | 120 | 'day_before';
+
+/**
+ * Configurações de lembretes
+ */
+export interface ReminderSettings {
+  appointmentRemindersEnabled: boolean; // Lembrete individual por agendamento
+  reminderOffset: ReminderOffset; // Antecedência do lembrete
+  dailyMorningReminderEnabled: boolean; // Lembrete matinal (1h antes do início do expediente)
+  dailyEveningReminderEnabled: boolean; // Lembrete noturno (1h após o término do expediente)
+}
+
+/**
  * Configurações do sistema
  */
 export interface AppSettings {
@@ -106,6 +163,7 @@ export interface AppSettings {
   timeSlotInterval: TimeSlotInterval; // Intervalo dos slots em minutos
   theme: ThemeMode;
   holidays: string[]; // Array de datas no formato YYYY-MM-DD
+  reminderSettings: ReminderSettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -121,6 +179,7 @@ export interface UpdateSettingsDTO {
   timeSlotInterval?: TimeSlotInterval;
   theme?: ThemeMode;
   holidays?: string[];
+  reminderSettings?: Partial<ReminderSettings>;
 }
 
 /**
@@ -133,4 +192,6 @@ export type RootStackParamList = {
   Schedule: undefined;
   CreateSchedule: undefined;
   Settings: undefined;
+  Clients: undefined;
+  CreateClient: { clientId?: string };
 };

@@ -8,3 +8,5 @@ export { CreateServiceScreen } from './CreateServiceScreen';
 export { ScheduleScreen } from './ScheduleScreen';
 export { CreateScheduleScreen } from './CreateScheduleScreen';
 export { SettingsScreen } from './SettingsScreen';
+export { ClientsScreen } from './ClientsScreen';
+export { CreateClientScreen } from './CreateClientScreen';
