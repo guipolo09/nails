@@ -3,6 +3,8 @@
 // ============================================
 
 export { clientRepository } from './clientRepository';
+export { professionalRepository } from './professionalRepository';
+export { packageRepository } from './packageRepository';
 
 export { serviceRepository } from './serviceRepository';
 export type { IServiceRepository } from './serviceRepository';

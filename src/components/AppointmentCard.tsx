@@ -5,24 +5,30 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Card, Text, IconButton, Chip, Button, useTheme } from 'react-native-paper';
-import { formatDateLong } from '../utils/helpers';
+import { formatDateLong, formatCurrency } from '../utils/helpers';
 import type { Appointment } from '../types';
 import dayjs from 'dayjs';
 
 interface AppointmentCardProps {
   appointment: Appointment;
   onDelete?: () => void;
+  onEdit?: () => void;
   onConfirm?: () => void;
   onMissed?: () => void;
+  onTogglePayment?: () => void;
   showDate?: boolean;
+  packageLabel?: string; // ex: "2/4" — posição do slot no pacote
 }
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
   onDelete,
+  onEdit,
   onConfirm,
   onMissed,
+  onTogglePayment,
   showDate = true,
+  packageLabel,
 }) => {
   const theme = useTheme();
   const isToday = appointment.date === dayjs().format('YYYY-MM-DD');
@@ -61,7 +67,13 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               numberOfLines={1}
             >
               {appointment.serviceName}
+              {appointment.priceCents != null ? ` · ${formatCurrency(appointment.priceCents)}` : ''}
             </Text>
+            {appointment.professionalName ? (
+              <Text style={[styles.professional, { color: theme.colors.primary }]} numberOfLines={1}>
+                {appointment.professionalName}
+              </Text>
+            ) : null}
             {showDate && (
               <Text style={[styles.date, { color: theme.colors.onSurfaceVariant }]}>
                 {isToday ? 'Hoje' : formatDateLong(appointment.date)}
@@ -69,30 +81,77 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
             )}
           </View>
 
-          {!isPast && onDelete && (
-            <IconButton
-              icon="close-circle"
-              size={26}
-              iconColor={theme.colors.error}
-              onPress={onDelete}
-              style={styles.deleteButton}
-            />
+          {!isPast && (onEdit || onDelete) && (
+            <View style={styles.actionsColumn}>
+              {onEdit && (
+                <IconButton
+                  icon="pencil"
+                  size={22}
+                  iconColor={theme.colors.primary}
+                  onPress={onEdit}
+                  style={styles.actionButton}
+                />
+              )}
+              {onDelete && (
+                <IconButton
+                  icon="close-circle"
+                  size={26}
+                  iconColor={theme.colors.error}
+                  onPress={onDelete}
+                  style={styles.actionButton}
+                />
+              )}
+            </View>
           )}
         </View>
 
-        {/* Chip do calendário */}
-        {appointment.calendarEventId && (
+        {/* Chips: pacote e/ou calendário */}
+        {(appointment.packageId || appointment.calendarEventId) && (
           <View style={styles.chipsRow}>
-            <Chip
-              icon="calendar-check"
-              style={[styles.chip, { backgroundColor: theme.colors.primaryContainer }]}
-              textStyle={styles.chipText}
-              compact
-            >
-              Agenda
-            </Chip>
+            {appointment.packageId && (
+              <Chip
+                icon="package-variant-closed"
+                style={[styles.chip, { backgroundColor: theme.colors.secondaryContainer ?? theme.colors.primaryContainer }]}
+                textStyle={[styles.chipText, { color: theme.colors.secondary ?? theme.colors.primary }]}
+                compact
+              >
+                {packageLabel ? `Pacote · ${packageLabel}` : 'Pacote'}
+              </Chip>
+            )}
+            {appointment.calendarEventId && (
+              <Chip
+                icon="calendar-check"
+                style={[styles.chip, { backgroundColor: theme.colors.primaryContainer }]}
+                textStyle={styles.chipText}
+                compact
+              >
+                Agenda
+              </Chip>
+            )}
           </View>
         )}
+
+        {/* Pagamento — quando há preço e não foi marcado como falta */}
+        {appointment.priceCents != null &&
+          appointment.attendanceStatus !== 'missed' &&
+          onTogglePayment && (
+            <View style={styles.paymentRow}>
+              <Button
+                mode={appointment.paymentStatus === 'paid' ? 'contained' : 'contained-tonal'}
+                icon={appointment.paymentStatus === 'paid' ? 'cash-check' : 'cash-clock'}
+                onPress={onTogglePayment}
+                buttonColor={appointment.paymentStatus === 'paid' ? '#2E7D32' : '#FFE0B2'}
+                textColor={appointment.paymentStatus === 'paid' ? '#FFFFFF' : '#E65100'}
+                style={styles.paymentButton}
+                contentStyle={styles.paymentButtonContent}
+                labelStyle={styles.paymentButtonLabel}
+              >
+                {appointment.paymentStatus === 'paid'
+                  ? `Pago · ${formatCurrency(appointment.priceCents)}`
+                  : `Marcar como pago · ${formatCurrency(appointment.priceCents)}`}
+              </Button>
+            </View>
+          )}
 
         {/* Seção de presença — sempre com a mesma altura para evitar resize do card */}
         {isPast && (attendanceStatus || onConfirm || onMissed) && (
@@ -177,12 +236,35 @@ const styles = StyleSheet.create({
     margin: 0,
     marginLeft: 4,
   },
+  actionsColumn: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  actionButton: {
+    margin: 0,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
     paddingLeft: 2,
+  },
+  paymentRow: {
+    marginTop: 10,
+    paddingLeft: 2,
+  },
+  paymentButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+  },
+  paymentButtonContent: {
+    height: 40,
+    paddingHorizontal: 8,
+  },
+  paymentButtonLabel: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   timeColumn: {
     alignItems: 'center',
@@ -211,6 +293,11 @@ const styles = StyleSheet.create({
   serviceName: {
     fontSize: 14,
     marginTop: 2,
+  },
+  professional: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '600',
   },
   date: {
     fontSize: 14,

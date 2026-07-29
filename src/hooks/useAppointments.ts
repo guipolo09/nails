@@ -4,6 +4,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { appointmentRepository } from '../services/appointmentRepository';
+import type { RescheduleAppointmentDTO } from '../services/appointmentRepository';
+import { packageRepository } from '../services/packageRepository';
 import { createCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 import {
   scheduleAppointmentReminder,
@@ -15,6 +17,13 @@ import { settingsRepository } from '../services/settingsRepository';
 import type { Appointment, CreateAppointmentDTO, OperationResult } from '../types';
 import { MESSAGES } from '../utils/constants';
 
+const sortAppointments = (list: Appointment[]): Appointment[] =>
+  [...list].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.startTime.localeCompare(b.startTime);
+  });
+
 interface UseAppointmentsReturn {
   appointments: Appointment[];
   loading: boolean;
@@ -22,7 +31,10 @@ interface UseAppointmentsReturn {
   refresh: () => Promise<void>;
   createAppointment: (data: CreateAppointmentDTO) => Promise<OperationResult<Appointment>>;
   deleteAppointment: (id: string) => Promise<OperationResult>;
+  deleteSeries: (groupId: string) => Promise<OperationResult>;
+  rescheduleAppointment: (id: string, data: RescheduleAppointmentDTO) => Promise<OperationResult<Appointment>>;
   updateAttendanceStatus: (id: string, status: 'confirmed' | 'missed') => Promise<OperationResult>;
+  updatePaymentStatus: (id: string, status: 'paid' | 'pending') => Promise<OperationResult>;
   getAppointmentsByDate: (date: string) => Promise<Appointment[]>;
 }
 
@@ -124,6 +136,11 @@ export const useAppointments = (): UseAppointmentsReturn => {
       // Cancelar lembrete de notificação local
       await cancelAppointmentReminder(id);
 
+      // Cancelar slot do pacote vinculado, se houver
+      if (appointment?.packageId) {
+        await packageRepository.cancelSlotByAppointmentId(id);
+      }
+
       const success = await appointmentRepository.delete(id);
       if (!success) {
         return {
@@ -143,6 +160,77 @@ export const useAppointments = (): UseAppointmentsReturn => {
         success: false,
         message: MESSAGES.APPOINTMENT_ERROR,
       };
+    }
+  }, [appointments]);
+
+  const deleteSeries = useCallback(async (groupId: string): Promise<OperationResult> => {
+    try {
+      const series = await appointmentRepository.getByRecurrenceGroup(groupId);
+      let count = 0;
+      for (const appt of series) {
+        const result = await deleteAppointment(appt.id);
+        if (result.success) count++;
+      }
+      return {
+        success: count > 0,
+        message: count > 0
+          ? `${count} agendamento(s) da série cancelado(s)!`
+          : MESSAGES.APPOINTMENT_ERROR,
+      };
+    } catch (err) {
+      console.error('Erro ao cancelar série:', err);
+      return { success: false, message: MESSAGES.APPOINTMENT_ERROR };
+    }
+  }, [deleteAppointment]);
+
+  const rescheduleAppointment = useCallback(async (
+    id: string,
+    data: RescheduleAppointmentDTO
+  ): Promise<OperationResult<Appointment>> => {
+    try {
+      const oldEventId = appointments.find(a => a.id === id)?.calendarEventId;
+
+      // Remarca (recalcula término, valida conflito e invalida o evento antigo)
+      const updated = await appointmentRepository.reschedule(id, data);
+
+      // Atualiza o evento no calendário: remove o antigo e cria o novo
+      if (oldEventId) {
+        await deleteCalendarEvent(oldEventId);
+      }
+      const calendarResult = await createCalendarEvent(updated);
+      if (calendarResult.success && calendarResult.eventId) {
+        await appointmentRepository.update(id, { calendarEventId: calendarResult.eventId });
+        updated.calendarEventId = calendarResult.eventId;
+      }
+
+      // Reagenda a notificação local
+      try {
+        await cancelAppointmentReminder(id);
+        const settings = await settingsRepository.getSettings();
+        if (settings.reminderSettings.appointmentRemindersEnabled) {
+          let hasPermission = await hasNotificationPermissions();
+          if (!hasPermission) {
+            hasPermission = await requestNotificationPermissions();
+          }
+          if (hasPermission) {
+            await scheduleAppointmentReminder(updated, settings.reminderSettings.reminderOffset);
+          }
+        }
+      } catch (notifError) {
+        console.error('Erro ao reagendar lembrete:', notifError);
+      }
+
+      setAppointments(prev =>
+        sortAppointments(prev.map(a => (a.id === id ? updated : a)))
+      );
+
+      return { success: true, data: updated, message: 'Agendamento remarcado com sucesso!' };
+    } catch (err) {
+      console.error('Erro ao remarcar agendamento:', err);
+      const errorMessage = err instanceof Error && err.message === 'Conflito de horário'
+        ? MESSAGES.APPOINTMENT_CONFLICT
+        : MESSAGES.APPOINTMENT_ERROR;
+      return { success: false, message: errorMessage };
     }
   }, [appointments]);
 
@@ -168,6 +256,28 @@ export const useAppointments = (): UseAppointmentsReturn => {
     }
   }, []);
 
+  const updatePaymentStatus = useCallback(async (
+    id: string,
+    status: 'paid' | 'pending'
+  ): Promise<OperationResult> => {
+    try {
+      const updated = await appointmentRepository.update(id, { paymentStatus: status });
+      if (!updated) {
+        return { success: false, message: 'Agendamento não encontrado' };
+      }
+      setAppointments(prev =>
+        prev.map(a => (a.id === id ? { ...a, paymentStatus: status } : a))
+      );
+      return {
+        success: true,
+        message: status === 'paid' ? 'Pagamento registrado!' : 'Marcado como pendente',
+      };
+    } catch (err) {
+      console.error('Erro ao atualizar pagamento:', err);
+      return { success: false, message: 'Erro ao atualizar pagamento' };
+    }
+  }, []);
+
   const getAppointmentsByDate = useCallback(async (date: string): Promise<Appointment[]> => {
     return appointmentRepository.getByDate(date);
   }, []);
@@ -179,7 +289,10 @@ export const useAppointments = (): UseAppointmentsReturn => {
     refresh: loadAppointments,
     createAppointment,
     deleteAppointment,
+    deleteSeries,
+    rescheduleAppointment,
     updateAttendanceStatus,
+    updatePaymentStatus,
     getAppointmentsByDate,
   };
 };

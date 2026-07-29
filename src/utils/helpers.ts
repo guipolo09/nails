@@ -4,7 +4,7 @@
 
 import dayjs from 'dayjs';
 import { BUSINESS_HOURS } from './constants';
-import type { TimeSlot, Appointment, AppSettings } from '../types';
+import type { TimeSlot, Appointment, AppSettings, RecurrenceInterval, WeeklyHours } from '../types';
 
 /**
  * Gera um ID único (compatível com React Native)
@@ -41,6 +41,26 @@ export const formatDateLong = (date: string): string => {
  */
 export const formatTime = (time: string): string => {
   return time;
+};
+
+/**
+ * Formata um valor em centavos para moeda brasileira (ex.: 4500 → "R$ 45,00").
+ */
+export const formatCurrency = (cents: number | null | undefined): string => {
+  const value = (cents ?? 0) / 100;
+  return `R$ ${value.toFixed(2).replace('.', ',')}`;
+};
+
+/**
+ * Converte um texto de preço digitado (ex.: "45", "45,50", "45.50") para centavos.
+ * Retorna undefined se vazio/ inválido.
+ */
+export const parsePriceToCents = (text: string): number | undefined => {
+  const cleaned = text.trim().replace(/\s/g, '').replace(',', '.');
+  if (!cleaned) return undefined;
+  const value = Number(cleaned);
+  if (!isFinite(value) || value < 0) return undefined;
+  return Math.round(value * 100);
 };
 
 /**
@@ -119,14 +139,22 @@ export const generateTimeSlotsWithSettings = (
 ): TimeSlot[] => {
   const slots: TimeSlot[] = [];
 
-  // Usar configurações personalizadas ou padrão
-  const START = settings?.businessHours.start ?? BUSINESS_HOURS.START;
-  const END = settings?.businessHours.end ?? BUSINESS_HOURS.END;
   const SLOT_INTERVAL = settings?.timeSlotInterval ?? BUSINESS_HOURS.SLOT_INTERVAL;
 
   // Verificar se é feriado
   if (settings?.holidays.includes(date)) {
     return []; // Retorna array vazio se for feriado
+  }
+
+  // Horário do dia da semana (autoridade), com fallback para o horário global
+  let START = settings?.businessHours.start ?? BUSINESS_HOURS.START;
+  let END = settings?.businessHours.end ?? BUSINESS_HOURS.END;
+  const weekday = dayjs(date).day();
+  const dayCfg = settings?.weeklyHours?.[weekday];
+  if (dayCfg) {
+    if (!dayCfg.open) return []; // dia fechado (folga fixa)
+    START = dayCfg.start;
+    END = dayCfg.end;
   }
 
   // Filtrar agendamentos do dia
@@ -155,6 +183,30 @@ export const generateTimeSlotsWithSettings = (
   }
 
   return slots;
+};
+
+/**
+ * Monta um horário semanal padrão (todos os dias com o mesmo horário; dias
+ * em `closedDays` ficam fechados).
+ */
+export const buildWeeklyHours = (
+  start: number,
+  end: number,
+  closedDays: number[] = []
+): WeeklyHours => {
+  const weekly: WeeklyHours = {};
+  for (let d = 0; d <= 6; d++) {
+    weekly[d] = { open: !closedDays.includes(d), start, end };
+  }
+  return weekly;
+};
+
+/**
+ * Verifica se um dia da semana está marcado como fechado (folga fixa).
+ */
+export const isDayClosed = (settings: AppSettings | null, date: string): boolean => {
+  const cfg = settings?.weeklyHours?.[dayjs(date).day()];
+  return cfg ? !cfg.open : false;
 };
 
 /**
@@ -200,4 +252,37 @@ export const getTodayISO = (): string => {
  */
 export const getCurrentTimestamp = (): string => {
   return dayjs().toISOString();
+};
+
+/**
+ * Número de dias entre repetições, por tipo de recorrência.
+ */
+export const RECURRENCE_DAYS: Record<RecurrenceInterval, number> = {
+  weekly: 7,
+  biweekly: 14,
+  '3weeks': 21,
+  monthly: 28,
+};
+
+/**
+ * Gera as datas subsequentes de uma recorrência (não inclui a data inicial).
+ * Ex.: getRecurrenceDates('2026-07-27', 14, 3) → quinzenas seguintes.
+ */
+export const getRecurrenceDates = (
+  startDate: string,
+  intervalDays: number,
+  count: number
+): string[] => {
+  return Array.from({ length: count }, (_, i) =>
+    dayjs(startDate).add((i + 1) * intervalDays, 'day').format('YYYY-MM-DD')
+  );
+};
+
+/**
+ * Diferença em minutos entre dois horários 'HH:mm' (fim - início).
+ */
+export const minutesBetween = (startTime: string, endTime: string): number => {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
 };

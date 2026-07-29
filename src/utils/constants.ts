@@ -3,12 +3,19 @@
 // ============================================
 
 /**
+ * Versão do app (mantenha em sincronia com app.json / package.json).
+ * Usada em exportações de dados (LGPD).
+ */
+export const APP_VERSION = '1.0.0';
+
+/**
  * Chaves de armazenamento local
  */
 export const STORAGE_KEYS = {
   SERVICES: '@nails/services',
   APPOINTMENTS: '@nails/appointments',
   SETTINGS: '@nails/settings',
+  PACKAGES: '@nails/packages',
 } as const;
 
 /**

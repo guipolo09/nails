@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { MD3LightTheme, MD3DarkTheme, configureFonts } from 'react-native-paper';
+import type { MD3Theme } from 'react-native-paper';
 import { COLORS } from '../utils/constants';
 import { settingsRepository } from '../services/settingsRepository';
 import type { ThemeMode } from '../types';
@@ -69,7 +70,7 @@ const darkTheme = {
   roundness: 12,
 };
 
-export type AppTheme = typeof lightTheme;
+export type AppTheme = MD3Theme;
 
 interface ThemeContextType {
   theme: AppTheme;

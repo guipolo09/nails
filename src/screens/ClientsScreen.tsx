@@ -12,11 +12,13 @@ import {
   List,
   IconButton,
   Divider,
+  Portal,
+  Modal,
   useTheme,
 } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { ScreenContainer, EmptyState, LoadingState } from '../components';
+import { ScreenContainer, EmptyState, LoadingState, BigButton } from '../components';
 import { useClients } from '../hooks/useClients';
 import { clientRepository } from '../services/clientRepository';
 import type { RootStackParamList, Client } from '../types';
@@ -28,6 +30,7 @@ export const ClientsScreen: React.FC = () => {
   const { clients, loading, loadClients, deleteClient } = useClients();
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewClient, setViewClient] = useState<Client | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -137,7 +140,7 @@ export const ClientsScreen: React.FC = () => {
                 </View>
               )}
               titleStyle={styles.clientName}
-              onPress={() => navigation.navigate('CreateClient', { clientId: item.id })}
+              onPress={() => setViewClient(item)}
             />
           )}
         />
@@ -158,6 +161,84 @@ export const ClientsScreen: React.FC = () => {
         onPress={() => navigation.navigate('CreateClient', {})}
         color="#FFFFFF"
       />
+
+      {/* Modal de visualização da cliente */}
+      <Portal>
+        <Modal
+          visible={viewClient !== null}
+          onDismiss={() => setViewClient(null)}
+          contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}
+        >
+          {viewClient && (
+            <View>
+              <View style={styles.modalHeader}>
+                <View style={[styles.modalAvatar, { backgroundColor: theme.colors.primaryContainer }]}>
+                  <Text style={[styles.modalAvatarText, { color: theme.colors.primary }]}>
+                    {viewClient.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.modalHeaderInfo}>
+                  <Text style={[styles.modalName, { color: theme.colors.onSurface }]}>
+                    {viewClient.name}
+                  </Text>
+                  {viewClient.tier === 'premium' && (
+                    <Chip
+                      compact
+                      style={[styles.premiumChip, { backgroundColor: theme.colors.primaryContainer }]}
+                      textStyle={[styles.premiumChipText, { color: theme.colors.primary }]}
+                    >
+                      Premium
+                    </Chip>
+                  )}
+                </View>
+              </View>
+
+              <Divider />
+
+              <List.Item
+                title={viewClient.phone ?? 'Sem telefone'}
+                description="Telefone"
+                left={props => <List.Icon {...props} icon="phone-outline" />}
+                titleStyle={!viewClient.phone ? { color: theme.colors.onSurfaceVariant } : undefined}
+              />
+
+              {viewClient.notes ? (
+                <List.Item
+                  title={viewClient.notes}
+                  description="Observações"
+                  left={props => <List.Icon {...props} icon="note-text-outline" />}
+                  titleNumberOfLines={4}
+                />
+              ) : null}
+
+              <List.Item
+                title={viewClient.tier === 'premium' ? 'Premium' : 'Regular'}
+                description="Classificação"
+                left={props => <List.Icon {...props} icon={viewClient.tier === 'premium' ? 'star' : 'account-outline'} />}
+                titleStyle={{ color: viewClient.tier === 'premium' ? theme.colors.primary : theme.colors.onSurface }}
+              />
+
+              <Divider style={{ marginBottom: 8 }} />
+
+              <View style={styles.modalActions}>
+                <BigButton
+                  label="Editar"
+                  icon="pencil-outline"
+                  onPress={() => {
+                    setViewClient(null);
+                    navigation.navigate('CreateClient', { clientId: viewClient.id });
+                  }}
+                />
+                <BigButton
+                  label="Fechar"
+                  mode="text"
+                  onPress={() => setViewClient(null)}
+                />
+              </View>
+            </View>
+          )}
+        </Modal>
+      </Portal>
     </ScreenContainer>
   );
 };
@@ -236,5 +317,43 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 24,
+  },
+
+  // Modal de visualização
+  modalContainer: {
+    marginHorizontal: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingTop: 20,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  modalAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalAvatarText: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  modalHeaderInfo: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  modalName: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  modalActions: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
 });

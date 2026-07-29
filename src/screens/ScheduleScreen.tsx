@@ -2,9 +2,9 @@
 // TELA DE LISTAGEM DE AGENDAMENTOS
 // ============================================
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { StyleSheet, View, SectionList, Pressable } from 'react-native';
-import { FAB, Snackbar, Text, SegmentedButtons, IconButton, useTheme } from 'react-native-paper';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { StyleSheet, View, SectionList, Pressable, PanResponder } from 'react-native';
+import { FAB, Snackbar, Text, SegmentedButtons, IconButton, Portal, Dialog, Button, useTheme } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import dayjs from 'dayjs';
@@ -15,7 +15,7 @@ import {
   LoadingState,
   ConfirmDialog,
 } from '../components';
-import { useAppointments } from '../hooks';
+import { useAppointments, usePackages } from '../hooks';
 import { formatDateLong } from '../utils/helpers';
 import type { RootStackParamList, Appointment } from '../types';
 
@@ -85,19 +85,35 @@ const DayCell: React.FC<{
 // ---- Tela principal ----
 export const ScheduleScreen: React.FC = () => {
   const navigation = useNavigation<ScheduleNavigationProp>();
-  const { appointments, loading, deleteAppointment, updateAttendanceStatus, refresh } = useAppointments();
+  const { appointments, loading, deleteAppointment, deleteSeries, updateAttendanceStatus, updatePaymentStatus, refresh } = useAppointments();
+  const { packages, loadPackages } = usePackages();
   const theme = useTheme();
 
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      loadPackages();
+    }, [refresh, loadPackages])
   );
+
+  // Mapa appointmentId → "N/Total" para badges de pacote
+  const packageSlotMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    packages.forEach(pkg => {
+      pkg.slots.forEach((slot, index) => {
+        if (slot.appointmentId) {
+          map[slot.appointmentId] = `${index + 1}/${pkg.slots.length}`;
+        }
+      });
+    });
+    return map;
+  }, [packages]);
 
   const [filter, setFilter] = useState<FilterType>('upcoming');
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(() => dayjs().format('YYYY-MM-DD'));
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [seriesDialogVisible, setSeriesDialogVisible] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -129,12 +145,47 @@ export const ScheduleScreen: React.FC = () => {
     setSelectedDate(prev => (prev === date ? null : date));
   };
 
+  // Navega um dia para frente ou para trás, trocando a semana se necessário
+  const navigateDay = useCallback((direction: 'prev' | 'next') => {
+    const delta = direction === 'next' ? 1 : -1;
+    setSelectedDate(prev => {
+      const base = prev ?? (direction === 'next' ? weekDays[0] : weekDays[6]);
+      const newDate = dayjs(base).add(delta, 'day').format('YYYY-MM-DD');
+      if (!weekDays.includes(newDate)) {
+        setWeekOffset(w => w + delta);
+      }
+      return newDate;
+    });
+  }, [weekDays]);
+
+  // Ref para que o PanResponder criado uma única vez acesse sempre a versão atual
+  const navigateDayRef = useRef(navigateDay);
+  navigateDayRef.current = navigateDay;
+
+  const swipePan = useRef(
+    PanResponder.create({
+      // Captura apenas gestos claramente horizontais (não quebra scroll vertical)
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > Math.abs(g.dy) * 2 && Math.abs(g.dx) > 20,
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > 60) navigateDayRef.current('prev');
+        else if (g.dx < -60) navigateDayRef.current('next');
+      },
+    })
+  ).current;
+
   const filteredAppointments = useMemo(() => {
     switch (filter) {
       case 'today':
         return appointments.filter(a => a.date === today);
-      case 'upcoming':
-        return appointments.filter(a => a.date >= today);
+      case 'upcoming': {
+        const weekSet = new Set(weekDays);
+        return appointments.filter(a => {
+          if (a.date < today) return false;
+          return selectedDate ? a.date === selectedDate : weekSet.has(a.date);
+        });
+      }
       case 'all': {
         const weekSet = new Set(weekDays);
         return appointments.filter(a =>
@@ -173,9 +224,18 @@ export const ScheduleScreen: React.FC = () => {
     setSnackbarVisible(true);
   };
 
+  const handleEditPress = (appointment: Appointment) => {
+    navigation.navigate('Reschedule', { appointmentId: appointment.id });
+  };
+
   const handleDeletePress = (appointment: Appointment) => {
     setAppointmentToDelete(appointment);
-    setDeleteDialogVisible(true);
+    // Agendamento recorrente: pergunta se cancela só este ou toda a série
+    if (appointment.recurrenceGroupId) {
+      setSeriesDialogVisible(true);
+    } else {
+      setDeleteDialogVisible(true);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -192,6 +252,29 @@ export const ScheduleScreen: React.FC = () => {
     setAppointmentToDelete(null);
   };
 
+  const handleDeleteSingleFromSeries = async () => {
+    if (appointmentToDelete) {
+      const result = await deleteAppointment(appointmentToDelete.id);
+      showSnackbar(result.message);
+    }
+    setSeriesDialogVisible(false);
+    setAppointmentToDelete(null);
+  };
+
+  const handleDeleteWholeSeries = async () => {
+    if (appointmentToDelete?.recurrenceGroupId) {
+      const result = await deleteSeries(appointmentToDelete.recurrenceGroupId);
+      showSnackbar(result.message);
+    }
+    setSeriesDialogVisible(false);
+    setAppointmentToDelete(null);
+  };
+
+  const handleCancelSeriesDialog = () => {
+    setSeriesDialogVisible(false);
+    setAppointmentToDelete(null);
+  };
+
   const handleConfirmAttendance = async (id: string) => {
     const result = await updateAttendanceStatus(id, 'confirmed');
     showSnackbar(result.message);
@@ -199,6 +282,12 @@ export const ScheduleScreen: React.FC = () => {
 
   const handleMissedAttendance = async (id: string) => {
     const result = await updateAttendanceStatus(id, 'missed');
+    showSnackbar(result.message);
+  };
+
+  const handleTogglePayment = async (appointment: Appointment) => {
+    const next = appointment.paymentStatus === 'paid' ? 'pending' : 'paid';
+    const result = await updatePaymentStatus(appointment.id, next);
     showSnackbar(result.message);
   };
 
@@ -234,8 +323,8 @@ export const ScheduleScreen: React.FC = () => {
         />
       </View>
 
-      {filter === 'all' && (
-        <>
+      {(filter === 'all' || filter === 'upcoming') ? (
+        <View style={styles.swipeArea} {...swipePan.panHandlers}>
           {/* Navegação por semana */}
           <View style={[styles.weekNavigatorBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
             <IconButton
@@ -267,45 +356,85 @@ export const ScheduleScreen: React.FC = () => {
               />
             ))}
           </View>
-        </>
-      )}
 
-      {sections.length === 0 ? (
-        <EmptyState
-          icon="calendar-blank"
-          title="Nenhum agendamento"
-          description={
-            filter === 'today'
-              ? 'Não há agendamentos para hoje'
-              : 'Adicione um novo agendamento tocando no botão +'
-          }
-        />
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item, index) => `apt-${item.id}-${index}`}
-          contentContainerStyle={styles.list}
-          renderSectionHeader={({ section }) => (
-            <Text
-              style={[
-                styles.sectionHeader,
-                { color: theme.colors.primary, backgroundColor: theme.colors.background },
-              ]}
-            >
-              {section.title}
-            </Text>
-          )}
-          renderItem={({ item }) => (
-            <AppointmentCard
-              appointment={item}
-              onDelete={() => handleDeletePress(item)}
-              onConfirm={() => handleConfirmAttendance(item.id)}
-              onMissed={() => handleMissedAttendance(item.id)}
-              showDate={false}
+          {/* Lista ou estado vazio */}
+          {sections.length === 0 ? (
+            <EmptyState
+              icon="calendar-blank"
+              title="Nenhum agendamento"
+              description={
+                filter === 'upcoming'
+                  ? 'Sem agendamentos nesta semana'
+                  : 'Adicione um novo agendamento tocando no botão +'
+              }
+            />
+          ) : (
+            <SectionList
+              sections={sections}
+              keyExtractor={(item, index) => `apt-${item.id}-${index}`}
+              contentContainerStyle={styles.list}
+              renderSectionHeader={({ section }) => (
+                <Text
+                  style={[
+                    styles.sectionHeader,
+                    { color: theme.colors.primary, backgroundColor: theme.colors.background },
+                  ]}
+                >
+                  {section.title}
+                </Text>
+              )}
+              renderItem={({ item }) => (
+                <AppointmentCard
+                  appointment={item}
+                  packageLabel={item.packageId ? packageSlotMap[item.id] : undefined}
+                  onEdit={() => handleEditPress(item)}
+                  onDelete={() => handleDeletePress(item)}
+                  onConfirm={() => handleConfirmAttendance(item.id)}
+                  onMissed={() => handleMissedAttendance(item.id)}
+                  onTogglePayment={() => handleTogglePayment(item)}
+                  showDate={false}
+                />
+              )}
+              stickySectionHeadersEnabled={false}
             />
           )}
-          stickySectionHeadersEnabled={false}
-        />
+        </View>
+      ) : (
+        /* Aba "Hoje" — sem swipe, renderiza direto */
+        sections.length === 0 ? (
+          <EmptyState
+            icon="calendar-blank"
+            title="Nenhum agendamento"
+            description="Não há agendamentos para hoje"
+          />
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={(item, index) => `apt-${item.id}-${index}`}
+            contentContainerStyle={styles.list}
+            renderSectionHeader={({ section }) => (
+              <Text
+                style={[
+                  styles.sectionHeader,
+                  { color: theme.colors.primary, backgroundColor: theme.colors.background },
+                ]}
+              >
+                {section.title}
+              </Text>
+            )}
+            renderItem={({ item }) => (
+              <AppointmentCard
+                appointment={item}
+                packageLabel={item.packageId ? packageSlotMap[item.id] : undefined}
+                onDelete={() => handleDeletePress(item)}
+                onConfirm={() => handleConfirmAttendance(item.id)}
+                onMissed={() => handleMissedAttendance(item.id)}
+                showDate={false}
+              />
+            )}
+            stickySectionHeadersEnabled={false}
+          />
+        )
       )}
 
       <FAB
@@ -325,6 +454,25 @@ export const ScheduleScreen: React.FC = () => {
         onCancel={handleCancelDelete}
         destructive
       />
+
+      {/* Diálogo de cancelamento de série recorrente */}
+      <Portal>
+        <Dialog visible={seriesDialogVisible} onDismiss={handleCancelSeriesDialog}>
+          <Dialog.Title>Agendamento recorrente</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              Este agendamento faz parte de uma série. O que deseja cancelar?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={styles.seriesActions}>
+            <Button onPress={handleCancelSeriesDialog}>Voltar</Button>
+            <Button onPress={handleDeleteSingleFromSeries}>Somente este</Button>
+            <Button textColor={theme.colors.error} onPress={handleDeleteWholeSeries}>
+              Toda a série
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar
         visible={snackbarVisible}
@@ -404,6 +552,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  swipeArea: {
+    flex: 1,
+  },
   list: {
     padding: 20,
     paddingTop: 10,
@@ -422,5 +573,9 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     marginBottom: 80,
+  },
+  seriesActions: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
 });

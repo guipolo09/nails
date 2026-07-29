@@ -1,12 +1,23 @@
 // ============================================
-// REPOSITÓRIO DE SERVIÇOS
-// Implementação local - preparado para futura API
+// REPOSITÓRIO DE SERVIÇOS (SQLite)
+// API assíncrona preservada para compatibilidade com hooks/telas
 // ============================================
 
-import { saveData, loadData } from '../storage/asyncStorage';
-import { STORAGE_KEYS } from '../utils/constants';
+import { db } from '../database/database';
 import { generateId, getCurrentTimestamp } from '../utils/helpers';
+import { recordChange } from '../sync/outbox';
 import type { Service, CreateServiceDTO, UpdateServiceDTO, Repository } from '../types';
+
+function serviceToRow(s: Service): Record<string, unknown> {
+  return {
+    id: s.id,
+    name: s.name,
+    durationMinutes: s.durationMinutes,
+    priceCents: s.priceCents ?? null,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
 
 /**
  * Interface do repositório de serviços
@@ -20,80 +31,90 @@ export interface IServiceRepository extends Repository<Service, CreateServiceDTO
   delete(id: string): Promise<boolean>;
 }
 
+interface ServiceRow {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  priceCents: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function rowToService(row: ServiceRow): Service {
+  return {
+    id: row.id,
+    name: row.name,
+    durationMinutes: row.durationMinutes,
+    priceCents: row.priceCents ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 /**
- * Implementação local do repositório usando AsyncStorage
+ * Implementação local do repositório usando SQLite
  */
 class LocalServiceRepository implements IServiceRepository {
-  private async getAllServices(): Promise<Service[]> {
-    const data = await loadData<Service[]>(STORAGE_KEYS.SERVICES);
-    return data || [];
-  }
-
-  private async saveAllServices(services: Service[]): Promise<void> {
-    await saveData(STORAGE_KEYS.SERVICES, services);
-  }
-
   async getAll(): Promise<Service[]> {
-    return this.getAllServices();
+    const rows = db.getAllSync<ServiceRow>('SELECT * FROM services ORDER BY name ASC');
+    return rows.map(rowToService);
   }
 
   async getById(id: string): Promise<Service | null> {
-    const services = await this.getAllServices();
-    return services.find(s => s.id === id) || null;
+    const row = db.getFirstSync<ServiceRow>('SELECT * FROM services WHERE id = ?', [id]);
+    return row ? rowToService(row) : null;
   }
 
   async create(data: CreateServiceDTO): Promise<Service> {
-    const services = await this.getAllServices();
     const timestamp = getCurrentTimestamp();
-
-    const newService: Service = {
+    const service: Service = {
       id: generateId(),
       name: data.name.trim(),
       durationMinutes: data.durationMinutes,
+      priceCents: data.priceCents,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
-    services.push(newService);
-    await this.saveAllServices(services);
+    db.runSync(
+      `INSERT INTO services (id, name, durationMinutes, priceCents, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [service.id, service.name, service.durationMinutes, service.priceCents ?? null, service.createdAt, service.updatedAt]
+    );
 
-    return newService;
+    recordChange('services', service.id, 'upsert', serviceToRow(service));
+    return service;
   }
 
   async update(id: string, data: UpdateServiceDTO): Promise<Service | null> {
-    const services = await this.getAllServices();
-    const index = services.findIndex(s => s.id === id);
+    const existing = await this.getById(id);
+    if (!existing) return null;
 
-    if (index === -1) {
-      return null;
-    }
-
-    const updatedService: Service = {
-      ...services[index],
-      ...data,
-      name: data.name?.trim() || services[index].name,
+    const updated: Service = {
+      ...existing,
+      name: data.name?.trim() || existing.name,
+      durationMinutes: data.durationMinutes ?? existing.durationMinutes,
+      priceCents: data.priceCents !== undefined ? data.priceCents : existing.priceCents,
       updatedAt: getCurrentTimestamp(),
     };
 
-    services[index] = updatedService;
-    await this.saveAllServices(services);
+    db.runSync(
+      `UPDATE services SET name = ?, durationMinutes = ?, priceCents = ?, updatedAt = ? WHERE id = ?`,
+      [updated.name, updated.durationMinutes, updated.priceCents ?? null, updated.updatedAt, id]
+    );
 
-    return updatedService;
+    recordChange('services', id, 'upsert', serviceToRow(updated));
+    return updated;
   }
 
   async delete(id: string): Promise<boolean> {
-    const services = await this.getAllServices();
-    const filteredServices = services.filter(s => s.id !== id);
-
-    if (filteredServices.length === services.length) {
-      return false;
+    const result = db.runSync('DELETE FROM services WHERE id = ?', [id]);
+    if (result.changes > 0) {
+      recordChange('services', id, 'delete', null);
     }
-
-    await this.saveAllServices(filteredServices);
-    return true;
+    return result.changes > 0;
   }
 }
 
 // Singleton para uso em todo o app
-// Futuramente pode ser substituído por ApiServiceRepository
 export const serviceRepository: IServiceRepository = new LocalServiceRepository();

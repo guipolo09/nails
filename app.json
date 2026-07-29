@@ -19,7 +19,8 @@
       "bundleIdentifier": "com.guilhermepolo09.nailsapp",
       "infoPlist": {
         "NSCalendarsUsageDescription": "Este app precisa acessar seu calendário para criar lembretes de agendamentos.",
-        "NSRemindersUsageDescription": "Este app precisa acessar lembretes para notificar sobre seus agendamentos."
+        "NSRemindersUsageDescription": "Este app precisa acessar lembretes para notificar sobre seus agendamentos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -31,20 +32,30 @@
       },
       "permissions": [
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "O app usa Face ID para desbloquear e proteger os dados das suas clientes."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
-        "projectId": "d3a89413-7d0a-4a6b-93b8-be15fd033211"
+        "projectId": "145ffff5-f6ff-4e79-9603-7b562089f3ac"
       }
     },
-    "plugins": [
-      "expo-sqlite"
-    ]
+    "owner": "guipolo09"
   }
 }

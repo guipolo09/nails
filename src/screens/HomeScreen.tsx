@@ -38,9 +38,30 @@ export const HomeScreen: React.FC = () => {
         />
 
         <BigButton
+          label="Pacotes"
+          icon="package-variant-closed"
+          onPress={() => navigation.navigate('Packages')}
+          mode="outlined"
+        />
+
+        <BigButton
           label="Serviços"
           icon="nail"
           onPress={() => navigation.navigate('Services')}
+          mode="outlined"
+        />
+
+        <BigButton
+          label="Profissionais"
+          icon="account-tie"
+          onPress={() => navigation.navigate('Professionals')}
+          mode="outlined"
+        />
+
+        <BigButton
+          label="Relatórios"
+          icon="chart-line"
+          onPress={() => navigation.navigate('Dashboard')}
           mode="outlined"
         />
 

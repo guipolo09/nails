@@ -1,0 +1,31 @@
+name: CI
+
+# Assume o repositório git com raiz na pasta `nails/` (onde fica o package.json).
+# Se o git for inicializado um nível acima (em nails-calendar/), mova este arquivo
+# para a raiz e ajuste os passos com `working-directory: nails`.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  quality:
+    name: Typecheck & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test -- --ci

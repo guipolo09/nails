@@ -17,10 +17,12 @@ import {
   Chip,
   Menu,
 } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer, LoadingState } from '../components';
 import { useSettings } from '../hooks/useSettings';
 import { useTheme } from '../context/ThemeContext';
-import type { TimeSlotInterval, ReminderOffset } from '../types';
+import type { TimeSlotInterval, ReminderOffset, RootStackParamList } from '../types';
 import {
   scheduleDailyMorningReminder,
   cancelDailyMorningReminder,
@@ -41,7 +43,10 @@ const REMINDER_OFFSET_OPTIONS: { value: ReminderOffset; label: string }[] = [
   { value: 'day_before', label: 'No dia anterior (às 9h)' },
 ];
 
+type SettingsNav = StackNavigationProp<RootStackParamList, 'Settings'>;
+
 export const SettingsScreen: React.FC = () => {
+  const navigation = useNavigation<SettingsNav>();
   const { settings, loading, updateBusinessHours, updateTimeSlotInterval, addHoliday, removeHoliday, updateReminderSettings } = useSettings();
   const { themeMode, toggleTheme } = useTheme();
 
@@ -231,9 +236,38 @@ export const SettingsScreen: React.FC = () => {
           Configurações do Sistema
         </Text>
 
+        {/* Conta e Segurança */}
+        <List.Section>
+          <List.Subheader>Conta e Segurança</List.Subheader>
+          <List.Item
+            title="Conta e Sincronização"
+            description="Backup na nuvem e login por telefone"
+            left={props => <List.Icon {...props} icon="cloud-sync" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => navigation.navigate('Account')}
+          />
+          <List.Item
+            title="Bloqueio, LGPD e exportação"
+            description="PIN/biometria, política de privacidade e exportar dados"
+            left={props => <List.Icon {...props} icon="shield-lock" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => navigation.navigate('Security')}
+          />
+        </List.Section>
+
+        <Divider />
+
         {/* Horário de Funcionamento */}
         <List.Section>
           <List.Subheader>Horário de Funcionamento</List.Subheader>
+
+          <List.Item
+            title="Horários por dia da semana"
+            description="Definir abertura/fechamento e folgas fixas por dia"
+            left={props => <List.Icon {...props} icon="calendar-week" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => navigation.navigate('BusinessHours')}
+          />
 
           <List.Item
             title="Hora de Início"

@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Card, Text, IconButton, useTheme } from 'react-native-paper';
-import { formatDuration } from '../utils/helpers';
+import { formatDuration, formatCurrency } from '../utils/helpers';
 import type { Service } from '../types';
 
 interface ServiceCardProps {
@@ -47,6 +47,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
           </Text>
           <Text style={[styles.duration, { color: theme.colors.onSurfaceVariant }]}>
             {formatDuration(service.durationMinutes)}
+            {service.priceCents != null ? ` · ${formatCurrency(service.priceCents)}` : ''}
           </Text>
         </View>
         {!selectable && (onEdit || onDelete) && (

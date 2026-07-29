@@ -4,7 +4,7 @@
 // ============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, Platform } from 'react-native';
 import {
   Text,
   Snackbar,
@@ -13,10 +13,14 @@ import {
   Switch,
   SegmentedButtons,
   Chip,
+  Portal,
+  Dialog,
+  Button,
   useTheme,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import dayjs from 'dayjs';
 import {
   ScreenContainer,
@@ -26,12 +30,20 @@ import {
   LoadingState,
   EmptyState,
 } from '../components';
-import { useServices, useAppointments, useSettings } from '../hooks';
+import { useServices, useAppointments, useSettings, useProfessionals } from '../hooks';
 import { clientRepository } from '../services/clientRepository';
-import { COLORS } from '../utils/constants';
-import { generateTimeSlotsWithSettings, formatDateLong, calculateEndTime } from '../utils/helpers';
-import { generateId } from '../utils/helpers';
-import type { RootStackParamList, Service, Appointment, Client, RecurrenceInterval, RecurrenceOptions } from '../types';
+import { COLORS, MESSAGES } from '../utils/constants';
+import {
+  generateTimeSlotsWithSettings,
+  formatDateLong,
+  formatDate,
+  calculateEndTime,
+  generateId,
+  getRecurrenceDates,
+  RECURRENCE_DAYS,
+  isDayClosed,
+} from '../utils/helpers';
+import type { RootStackParamList, Service, Appointment, Client, RecurrenceInterval, Professional } from '../types';
 
 type CreateScheduleNavigationProp = StackNavigationProp<RootStackParamList, 'CreateSchedule'>;
 
@@ -44,20 +56,15 @@ const RECURRENCE_OPTIONS: { value: RecurrenceInterval; label: string }[] = [
   { value: 'monthly',  label: 'Mensal' },
 ];
 
-const RECURRENCE_COUNTS = [2, 3, 4, 6];
-
-const RECURRENCE_DAYS: Record<RecurrenceInterval, number> = {
-  weekly:   7,
-  biweekly: 14,
-  '3weeks': 21,
-  monthly:  28,
-};
+const RECURRENCE_COUNTS = [1, 2, 3, 4, 6];
 
 export const CreateScheduleScreen: React.FC = () => {
   const navigation = useNavigation<CreateScheduleNavigationProp>();
   const { services, loading: loadingServices } = useServices();
   const { createAppointment } = useAppointments();
   const { settings } = useSettings();
+  const { professionals } = useProfessionals();
+  const activeProfessionals = professionals.filter(p => p.active);
   const theme = useTheme();
 
   // Fluxo
@@ -67,6 +74,7 @@ export const CreateScheduleScreen: React.FC = () => {
   const [clientName, setClientName] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
@@ -81,6 +89,8 @@ export const CreateScheduleScreen: React.FC = () => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
 
   const { getAppointmentsByDate } = useAppointments();
 
@@ -100,11 +110,13 @@ export const CreateScheduleScreen: React.FC = () => {
       const date = dayjs().add(i, 'day');
       const dateString = date.format('YYYY-MM-DD');
       const isHoliday = settings?.holidays.includes(dateString) || false;
+      const isClosed = isDayClosed(settings, dateString);
       dates.push({
         value: dateString,
         label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : formatDateLong(dateString),
         weekday: date.format('ddd'),
         isHoliday,
+        isClosed,
       });
     }
     return dates;
@@ -131,10 +143,7 @@ export const CreateScheduleScreen: React.FC = () => {
   // Datas que serão geradas pela recorrência
   const recurrenceDates = useMemo(() => {
     if (!selectedDate || !recurrenceEnabled) return [];
-    const days = RECURRENCE_DAYS[recurrenceInterval];
-    return Array.from({ length: recurrenceCount }, (_, i) =>
-      dayjs(selectedDate).add((i + 1) * days, 'day').format('YYYY-MM-DD')
-    );
+    return getRecurrenceDates(selectedDate, RECURRENCE_DAYS[recurrenceInterval], recurrenceCount);
   }, [selectedDate, recurrenceEnabled, recurrenceInterval, recurrenceCount]);
 
   const showSnackbar = (message: string) => {
@@ -170,6 +179,19 @@ export const CreateScheduleScreen: React.FC = () => {
     setCurrentStep('time');
   };
 
+  const handlePickOtherDate = (event: { type: string }, date?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (date && event.type !== 'dismissed') {
+      setPickerDate(date);
+      const dateString = dayjs(date).format('YYYY-MM-DD');
+      if (settings?.holidays.includes(dateString)) {
+        showSnackbar('Esta data é um feriado. Escolha outra.');
+        return;
+      }
+      handleSelectDate(dateString);
+    }
+  };
+
   const handleSelectTime = (time: string) => {
     setSelectedTime(time);
     setCurrentStep('confirm');
@@ -203,18 +225,35 @@ export const CreateScheduleScreen: React.FC = () => {
 
     setLoading(true);
     try {
+      // Auto-cadastro de cliente premium ao criar agendamento recorrente
+      let effectiveClientId = selectedClient?.id;
+      if (recurrenceEnabled && !selectedClient && clientName.trim()) {
+        const newClient = clientRepository.create({
+          name: clientName.trim(),
+          tier: 'premium',
+        });
+        effectiveClientId = newClient.id;
+      }
+
       const groupId = recurrenceEnabled ? generateId() : undefined;
       const allDates = [selectedDate, ...recurrenceDates];
       const datesToCreate = recurrenceEnabled ? allDates : [selectedDate];
 
       let successCount = 0;
       let lastMessage = '';
+      const failed: { date: string; reason: string }[] = [];
 
       for (const date of datesToCreate) {
+        // Feriados são pulados explicitamente (com feedback), não criados
+        if (settings?.holidays.includes(date)) {
+          failed.push({ date, reason: 'feriado' });
+          continue;
+        }
         const result = await createAppointment({
           clientName: clientName.trim(),
-          clientId: selectedClient?.id,
+          clientId: effectiveClientId,
           serviceId: selectedService.id,
+          professionalId: selectedProfessional?.id,
           date,
           startTime: selectedTime,
           recurrenceGroupId: groupId,
@@ -222,17 +261,29 @@ export const CreateScheduleScreen: React.FC = () => {
         if (result.success) {
           successCount++;
           lastMessage = result.message;
+        } else {
+          const reason = result.message === MESSAGES.APPOINTMENT_CONFLICT ? 'horário ocupado' : 'erro';
+          failed.push({ date, reason });
         }
       }
 
       if (successCount > 0) {
-        const msg = recurrenceEnabled
+        let msg = recurrenceEnabled
           ? `${successCount} agendamento(s) criado(s) com sucesso!`
           : lastMessage;
+        if (failed.length > 0) {
+          const details = failed.map(f => `${formatDate(f.date)} (${f.reason})`).join(', ');
+          msg += ` Não criados: ${details}.`;
+        }
         showSnackbar(msg);
-        setTimeout(() => navigation.goBack(), 1500);
+        setTimeout(() => navigation.goBack(), failed.length > 0 ? 3500 : 1500);
       } else {
-        showSnackbar('Não foi possível criar os agendamentos');
+        const details = failed.map(f => `${formatDate(f.date)} (${f.reason})`).join(', ');
+        showSnackbar(
+          details
+            ? `Não foi possível agendar: ${details}.`
+            : 'Não foi possível criar os agendamentos'
+        );
       }
     } finally {
       setLoading(false);
@@ -367,18 +418,34 @@ export const CreateScheduleScreen: React.FC = () => {
       {availableDates.map(item => (
         <View key={item.value}>
           <BigButton
-            label={item.isHoliday ? `${item.label} (Feriado)` : item.label}
+            label={
+              item.isHoliday
+                ? `${item.label} (Feriado)`
+                : item.isClosed
+                ? `${item.label} (Fechado)`
+                : item.label
+            }
             mode={selectedDate === item.value ? 'contained' : 'outlined'}
             onPress={() => handleSelectDate(item.value)}
-            disabled={item.isHoliday}
+            disabled={item.isHoliday || item.isClosed}
           />
-          {item.isHoliday && (
+          {(item.isHoliday || item.isClosed) && (
             <Text style={[styles.holidayText, { color: theme.colors.error }]}>
               Sem atendimento neste dia
             </Text>
           )}
         </View>
       ))}
+
+      <BigButton
+        label="Escolher outra data"
+        icon="calendar"
+        mode="text"
+        onPress={() => {
+          setPickerDate(new Date());
+          setShowDatePicker(true);
+        }}
+      />
     </>
   );
 
@@ -427,6 +494,34 @@ export const CreateScheduleScreen: React.FC = () => {
           <Divider style={{ backgroundColor: theme.colors.outlineVariant }} />
           <ConfirmRow label="Horário" value={`${selectedTime} às ${endTime}`} />
         </View>
+
+        {/* Seleção de profissional (apenas se houver profissionais ativos) */}
+        {activeProfessionals.length > 0 && (
+          <View style={[styles.recurrenceCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
+            <Text style={[styles.recurrenceToggleTitle, { color: theme.colors.onSurface }]}>
+              Profissional
+            </Text>
+            <View style={styles.professionalChips}>
+              <Chip
+                selected={!selectedProfessional}
+                onPress={() => setSelectedProfessional(null)}
+                style={styles.professionalChip}
+              >
+                Qualquer
+              </Chip>
+              {activeProfessionals.map(prof => (
+                <Chip
+                  key={prof.id}
+                  selected={selectedProfessional?.id === prof.id}
+                  onPress={() => setSelectedProfessional(prof)}
+                  style={styles.professionalChip}
+                >
+                  {prof.name}
+                </Chip>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Opção de recorrência */}
         <View style={[styles.recurrenceCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant }]}>
@@ -534,7 +629,41 @@ export const CreateScheduleScreen: React.FC = () => {
         <BigButton label="Voltar" mode="text" icon="arrow-left" onPress={handleBack} />
       )}
 
-      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={3000}>
+      {/* Date picker nativo para datas além dos próximos 7 dias */}
+      {showDatePicker && (
+        <>
+          <DateTimePicker
+            value={pickerDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            onChange={handlePickOtherDate}
+            minimumDate={new Date()}
+          />
+          {Platform.OS === 'ios' && (
+            <Portal>
+              <Dialog visible={showDatePicker} onDismiss={() => setShowDatePicker(false)}>
+                <Dialog.Title>Escolher data</Dialog.Title>
+                <Dialog.Content>
+                  <Text>Data selecionada: {dayjs(pickerDate).format('DD/MM/YYYY')}</Text>
+                </Dialog.Content>
+                <Dialog.Actions>
+                  <Button onPress={() => setShowDatePicker(false)}>Fechar</Button>
+                  <Button
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      handlePickOtherDate({ type: 'set' }, pickerDate);
+                    }}
+                  >
+                    Selecionar
+                  </Button>
+                </Dialog.Actions>
+              </Dialog>
+            </Portal>
+          )}
+        </>
+      )}
+
+      <Snackbar visible={snackbarVisible} onDismiss={() => setSnackbarVisible(false)} duration={4000}>
         {snackbarMessage}
       </Snackbar>
     </ScreenContainer>
@@ -649,7 +778,7 @@ const styles = StyleSheet.create({
   segmented: { marginBottom: 12 },
   countRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   countChip: {
-    width: 52,
+    flex: 1,
     height: 40,
     borderRadius: 8,
     borderWidth: 1,
@@ -661,4 +790,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 20,
   },
+  professionalChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  professionalChip: {},
 });

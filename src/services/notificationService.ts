@@ -19,7 +19,8 @@ const DAILY_EVENING_NOTIFICATION_ID = 'daily_evening_reminder';
 export const setupNotificationHandler = () => {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),
@@ -105,6 +106,7 @@ export const scheduleAppointmentReminder = async (
         data: { appointmentId: appointment.id },
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: triggerDate.toDate(),
       },
     });

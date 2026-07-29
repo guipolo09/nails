@@ -4,7 +4,20 @@
 
 import { db } from '../database/database';
 import { generateId, getCurrentTimestamp } from '../utils/helpers';
+import { recordChange } from '../sync/outbox';
 import type { Client, CreateClientDTO, UpdateClientDTO } from '../types';
+
+function clientToRow(c: Client): Record<string, unknown> {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone ?? null,
+    notes: c.notes ?? null,
+    tier: c.tier,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+}
 
 interface ClientRow {
   id: string;
@@ -79,6 +92,7 @@ class LocalClientRepository {
       ]
     );
 
+    recordChange('clients', client.id, 'upsert', clientToRow(client));
     return client;
   }
 
@@ -108,11 +122,15 @@ class LocalClientRepository {
       ]
     );
 
+    recordChange('clients', id, 'upsert', clientToRow(updated));
     return updated;
   }
 
   delete(id: string): boolean {
     const result = db.runSync('DELETE FROM clients WHERE id = ?', [id]);
+    if (result.changes > 0) {
+      recordChange('clients', id, 'delete', null);
+    }
     return result.changes > 0;
   }
 }

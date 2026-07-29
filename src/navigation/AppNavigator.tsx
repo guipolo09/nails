@@ -14,6 +14,17 @@ import {
   SettingsScreen,
   ClientsScreen,
   CreateClientScreen,
+  PackagesScreen,
+  CreatePackageScreen,
+  PackageDetailScreen,
+  SchedulePackageSlotScreen,
+  SecurityScreen,
+  PrivacyPolicyScreen,
+  RescheduleScreen,
+  AccountScreen,
+  DashboardScreen,
+  ProfessionalsScreen,
+  BusinessHoursScreen,
 } from '../screens';
 import type { RootStackParamList } from '../types';
 
@@ -100,6 +111,72 @@ export const AppNavigator: React.FC = () => {
         options={({ route }) => ({
           title: route.params?.clientId ? 'Editar Cliente' : 'Nova Cliente',
         })}
+      />
+
+      <Stack.Screen
+        name="Packages"
+        component={PackagesScreen}
+        options={{ title: 'Pacotes' }}
+      />
+
+      <Stack.Screen
+        name="CreatePackage"
+        component={CreatePackageScreen}
+        options={{ title: 'Novo Pacote' }}
+      />
+
+      <Stack.Screen
+        name="PackageDetail"
+        component={PackageDetailScreen}
+        options={{ title: 'Detalhes do Pacote' }}
+      />
+
+      <Stack.Screen
+        name="SchedulePackageSlot"
+        component={SchedulePackageSlotScreen}
+        options={{ title: 'Agendar Horário' }}
+      />
+
+      <Stack.Screen
+        name="Security"
+        component={SecurityScreen}
+        options={{ title: 'Segurança e Privacidade' }}
+      />
+
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ title: 'Política de Privacidade' }}
+      />
+
+      <Stack.Screen
+        name="Reschedule"
+        component={RescheduleScreen}
+        options={{ title: 'Remarcar Agendamento' }}
+      />
+
+      <Stack.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{ title: 'Conta e Sincronização' }}
+      />
+
+      <Stack.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ title: 'Relatórios' }}
+      />
+
+      <Stack.Screen
+        name="Professionals"
+        component={ProfessionalsScreen}
+        options={{ title: 'Profissionais' }}
+      />
+
+      <Stack.Screen
+        name="BusinessHours"
+        component={BusinessHoursScreen}
+        options={{ title: 'Horários de Funcionamento' }}
       />
     </Stack.Navigator>
   );

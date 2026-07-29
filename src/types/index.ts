@@ -10,6 +10,7 @@ export interface Service {
   id: string;
   name: string;
   durationMinutes: number;
+  priceCents?: number; // preço em centavos (evita erro de arredondamento)
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +21,7 @@ export interface Service {
 export interface CreateServiceDTO {
   name: string;
   durationMinutes: number;
+  priceCents?: number;
 }
 
 /**
@@ -28,6 +30,28 @@ export interface CreateServiceDTO {
 export interface UpdateServiceDTO {
   name?: string;
   durationMinutes?: number;
+  priceCents?: number;
+}
+
+/**
+ * Profissional do salão (manicure/pedicure)
+ */
+export interface Professional {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProfessionalDTO {
+  name: string;
+  active?: boolean;
+}
+
+export interface UpdateProfessionalDTO {
+  name?: string;
+  active?: boolean;
 }
 
 /**
@@ -68,6 +92,43 @@ export interface RecurrenceOptions {
 }
 
 /**
+ * Slot individual dentro de um pacote de serviços
+ */
+export interface PackageSlot {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  durationMinutes: number;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  appointmentId?: string;
+  status: 'pending' | 'scheduled' | 'cancelled';
+}
+
+/**
+ * Pacote de serviços contratado por uma cliente
+ */
+export interface ServicePackage {
+  id: string;
+  clientId?: string;
+  clientName: string;
+  slots: PackageSlot[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePackageDTO {
+  clientId?: string;
+  clientName: string;
+  slots: Array<{
+    serviceId: string;
+    serviceName: string;
+    durationMinutes: number;
+  }>;
+}
+
+/**
  * Agendamento de um serviço
  */
 export interface Appointment {
@@ -76,12 +137,17 @@ export interface Appointment {
   clientId?: string; // vínculo com cliente cadastrada
   serviceId: string;
   serviceName: string;
+  professionalId?: string; // profissional responsável (opcional)
+  professionalName?: string; // snapshot do nome do profissional
   date: string; // ISO date string (YYYY-MM-DD)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   calendarEventId?: string; // ID do evento no Google Calendar
   attendanceStatus?: 'confirmed' | 'missed'; // Status de presença da cliente
+  priceCents?: number; // snapshot do preço no momento do agendamento
+  paymentStatus?: 'paid' | 'pending'; // status de pagamento
   recurrenceGroupId?: string; // agrupa agendamentos recorrentes
+  packageId?: string; // vínculo com pacote de serviços
   createdAt: string;
   updatedAt: string;
 }
@@ -93,9 +159,11 @@ export interface CreateAppointmentDTO {
   clientName: string;
   clientId?: string;
   serviceId: string;
+  professionalId?: string;
   date: string;
   startTime: string;
   recurrenceGroupId?: string;
+  packageId?: string;
 }
 
 /**
@@ -153,13 +221,28 @@ export interface ReminderSettings {
 }
 
 /**
+ * Horário de funcionamento de um dia da semana.
+ */
+export interface DayHours {
+  open: boolean;
+  start: number; // 0-23
+  end: number; // 0-23
+}
+
+/**
+ * Horários por dia da semana (0 = Domingo ... 6 = Sábado).
+ */
+export type WeeklyHours = Record<number, DayHours>;
+
+/**
  * Configurações do sistema
  */
 export interface AppSettings {
   businessHours: {
-    start: number; // Hora de início (0-23)
+    start: number; // Hora de início (0-23) — global/legado, usado nos lembretes diários
     end: number; // Hora de fim (0-23)
   };
+  weeklyHours?: WeeklyHours; // Horário por dia da semana (autoridade para os slots)
   timeSlotInterval: TimeSlotInterval; // Intervalo dos slots em minutos
   theme: ThemeMode;
   holidays: string[]; // Array de datas no formato YYYY-MM-DD
@@ -176,6 +259,7 @@ export interface UpdateSettingsDTO {
     start: number;
     end: number;
   };
+  weeklyHours?: WeeklyHours;
   timeSlotInterval?: TimeSlotInterval;
   theme?: ThemeMode;
   holidays?: string[];
@@ -194,4 +278,15 @@ export type RootStackParamList = {
   Settings: undefined;
   Clients: undefined;
   CreateClient: { clientId?: string };
+  Packages: undefined;
+  CreatePackage: undefined;
+  PackageDetail: { packageId: string };
+  SchedulePackageSlot: { packageId: string; slotId: string };
+  Security: undefined;
+  PrivacyPolicy: undefined;
+  Reschedule: { appointmentId: string };
+  Account: undefined;
+  Dashboard: undefined;
+  Professionals: undefined;
+  BusinessHours: undefined;
 };

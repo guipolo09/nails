@@ -1,65 +1,97 @@
 // ============================================
-// REPOSITÓRIO DE CONFIGURAÇÕES
-// Gerencia armazenamento e recuperação de configurações do app
+// REPOSITÓRIO DE CONFIGURAÇÕES (SQLite)
+// Armazena o objeto AppSettings como JSON numa tabela chave-valor.
+// API assíncrona preservada para compatibilidade com hooks/telas.
 // ============================================
 
-import { getItem, setItem } from '../storage/asyncStorage';
-import { STORAGE_KEYS } from '../utils/constants';
+import { db } from '../database/database';
+import { buildWeeklyHours } from '../utils/helpers';
 import type { AppSettings, UpdateSettingsDTO, ReminderSettings } from '../types';
+
+const SETTINGS_KEY = 'app';
 
 /**
  * Configurações padrão do aplicativo
  */
-const DEFAULT_SETTINGS: AppSettings = {
-  businessHours: {
-    start: 8, // 8:00
-    end: 18, // 18:00
-  },
-  timeSlotInterval: 30, // 30 minutos
-  theme: 'light',
-  holidays: [],
-  reminderSettings: {
-    appointmentRemindersEnabled: false,
-    reminderOffset: 30,
-    dailyMorningReminderEnabled: false,
-    dailyEveningReminderEnabled: false,
-  },
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+const buildDefaultSettings = (): AppSettings => {
+  const now = new Date().toISOString();
+  return {
+    businessHours: { start: 8, end: 18 },
+    weeklyHours: buildWeeklyHours(8, 18), // todos os dias abertos 8-18 por padrão
+    timeSlotInterval: 30,
+    theme: 'light',
+    holidays: [],
+    reminderSettings: {
+      appointmentRemindersEnabled: false,
+      reminderOffset: 30,
+      dailyMorningReminderEnabled: false,
+      dailyEveningReminderEnabled: false,
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
 };
 
+function readRaw(): AppSettings | null {
+  const row = db.getFirstSync<{ value: string }>(
+    'SELECT value FROM settings WHERE key = ?',
+    [SETTINGS_KEY]
+  );
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value) as AppSettings;
+  } catch {
+    return null;
+  }
+}
+
+function writeRaw(settings: AppSettings): void {
+  db.runSync(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [SETTINGS_KEY, JSON.stringify(settings)]
+  );
+}
+
 /**
- * Repositório local de configurações usando AsyncStorage
+ * Repositório local de configurações usando SQLite
  */
 export class LocalSettingsRepository {
   /**
-   * Obtém as configurações atuais ou retorna configurações padrão.
-   * Garante retrocompatibilidade com versões anteriores que não tinham reminderSettings.
+   * Obtém as configurações atuais ou retorna/persiste as padrões.
+   * Garante retrocompatibilidade com versões que não tinham reminderSettings.
    */
   async getSettings(): Promise<AppSettings> {
     try {
-      const settings = await getItem<AppSettings>(STORAGE_KEYS.SETTINGS);
+      const settings = readRaw();
 
       if (!settings) {
-        // Se não existir configuração, salva as configurações padrão
-        await setItem(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-        return DEFAULT_SETTINGS;
+        const defaults = buildDefaultSettings();
+        writeRaw(defaults);
+        return defaults;
       }
 
       // Migração: adiciona reminderSettings se não existir
-      if (!settings.reminderSettings) {
-        const migrated: AppSettings = {
-          ...settings,
-          reminderSettings: DEFAULT_SETTINGS.reminderSettings,
+      let migrated = settings;
+      if (!migrated.reminderSettings) {
+        migrated = { ...migrated, reminderSettings: buildDefaultSettings().reminderSettings };
+      }
+      // Migração: deriva weeklyHours do horário global se ainda não existir
+      if (!migrated.weeklyHours) {
+        migrated = {
+          ...migrated,
+          weeklyHours: buildWeeklyHours(migrated.businessHours.start, migrated.businessHours.end),
         };
-        await setItem(STORAGE_KEYS.SETTINGS, migrated);
+      }
+      if (migrated !== settings) {
+        writeRaw(migrated);
         return migrated;
       }
 
       return settings;
     } catch (error) {
       console.error('Erro ao buscar configurações:', error);
-      return DEFAULT_SETTINGS;
+      return buildDefaultSettings();
     }
   }
 
@@ -82,7 +114,7 @@ export class LocalSettingsRepository {
         updatedAt: new Date().toISOString(),
       };
 
-      await setItem(STORAGE_KEYS.SETTINGS, updatedSettings);
+      writeRaw(updatedSettings);
       return updatedSettings;
     } catch (error) {
       console.error('Erro ao atualizar configurações:', error);
@@ -103,12 +135,9 @@ export class LocalSettingsRepository {
   async addHoliday(date: string): Promise<AppSettings> {
     try {
       const settings = await this.getSettings();
-
-      // Verifica se o feriado já existe
       if (settings.holidays.includes(date)) {
         return settings;
       }
-
       const updatedHolidays = [...settings.holidays, date].sort();
       return await this.updateSettings({ holidays: updatedHolidays });
     } catch (error) {
@@ -149,8 +178,9 @@ export class LocalSettingsRepository {
    */
   async resetToDefaults(): Promise<AppSettings> {
     try {
-      await setItem(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-      return DEFAULT_SETTINGS;
+      const defaults = buildDefaultSettings();
+      writeRaw(defaults);
+      return defaults;
     } catch (error) {
       console.error('Erro ao resetar configurações:', error);
       throw error;

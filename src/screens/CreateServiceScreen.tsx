@@ -10,6 +10,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer, BigButton } from '../components';
 import { useServices } from '../hooks';
 import { COLORS, MESSAGES } from '../utils/constants';
+import { parsePriceToCents } from '../utils/helpers';
 import type { RootStackParamList } from '../types';
 
 type CreateServiceNavigationProp = StackNavigationProp<RootStackParamList, 'CreateService'>;
@@ -26,6 +27,7 @@ export const CreateServiceScreen: React.FC = () => {
 
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
+  const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -36,6 +38,11 @@ export const CreateServiceScreen: React.FC = () => {
       if (service) {
         setName(service.name);
         setDuration(service.durationMinutes.toString());
+        setPrice(
+          service.priceCents != null
+            ? (service.priceCents / 100).toFixed(2).replace('.', ',')
+            : ''
+        );
       }
     }
   }, [editingServiceId, services]);
@@ -63,17 +70,20 @@ export const CreateServiceScreen: React.FC = () => {
     setLoading(true);
     try {
       const durationMinutes = parseInt(duration, 10);
+      const priceCents = parsePriceToCents(price) ?? null;
 
       let result;
       if (isEditing) {
         result = await updateService(editingServiceId, {
           name: name.trim(),
           durationMinutes,
+          priceCents: priceCents ?? undefined,
         });
       } else {
         result = await createService({
           name: name.trim(),
           durationMinutes,
+          priceCents: priceCents ?? undefined,
         });
       }
 
@@ -139,6 +149,17 @@ export const CreateServiceScreen: React.FC = () => {
               />
             ))}
           </View>
+
+          <TextInput
+            label="Preço (R$) — opcional"
+            value={price}
+            onChangeText={text => setPrice(text.replace(/[^0-9.,]/g, ''))}
+            mode="outlined"
+            style={[styles.input, styles.priceInput, { backgroundColor: theme.colors.surface }]}
+            placeholder="Ex: 45,00"
+            keyboardType="decimal-pad"
+            left={<TextInput.Affix text="R$ " />}
+          />
         </View>
 
         <View style={styles.actions}>
@@ -188,6 +209,9 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
+  },
+  priceInput: {
+    marginTop: 16,
   },
   durationLabel: {
     fontSize: 14,

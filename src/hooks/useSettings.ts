@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { settingsRepository } from '../services/settingsRepository';
-import type { AppSettings, UpdateSettingsDTO, TimeSlotInterval, ThemeMode, ReminderSettings } from '../types';
+import type { AppSettings, UpdateSettingsDTO, TimeSlotInterval, ThemeMode, ReminderSettings, WeeklyHours } from '../types';
 
 /**
  * Hook customizado para gerenciar configurações do sistema
@@ -68,6 +68,21 @@ export const useSettings = () => {
    */
   const updateTimeSlotInterval = useCallback(async (interval: TimeSlotInterval) => {
     return await updateSettings({ timeSlotInterval: interval });
+  }, [updateSettings]);
+
+  /**
+   * Atualiza os horários por dia da semana. Mantém o horário global (usado nos
+   * lembretes) sincronizado com o menor início / maior fim entre os dias abertos.
+   */
+  const updateWeeklyHours = useCallback(async (weeklyHours: WeeklyHours) => {
+    const openDays = Object.values(weeklyHours).filter(d => d.open);
+    const businessHours = openDays.length > 0
+      ? {
+          start: Math.min(...openDays.map(d => d.start)),
+          end: Math.max(...openDays.map(d => d.end)),
+        }
+      : undefined;
+    return await updateSettings(businessHours ? { weeklyHours, businessHours } : { weeklyHours });
   }, [updateSettings]);
 
   /**
@@ -161,6 +176,7 @@ export const useSettings = () => {
     updateSettings,
     updateBusinessHours,
     updateTimeSlotInterval,
+    updateWeeklyHours,
     updateTheme,
     addHoliday,
     removeHoliday,
