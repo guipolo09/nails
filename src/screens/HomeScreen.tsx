@@ -9,12 +9,18 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer, BigButton } from '../components';
 import { COLORS } from '../utils/constants';
+import { useEntitlement } from '../context/EntitlementContext';
 import type { RootStackParamList } from '../types';
 
 type HomeNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeNavigationProp>();
+  const { isPro } = useEntitlement();
+
+  // Recursos PRO: se não for assinante (e a cobrança estiver ativa), leva ao paywall.
+  const goProOr = (screen: keyof RootStackParamList) => () =>
+    isPro ? navigation.navigate(screen as never) : navigation.navigate('Paywall');
 
   return (
     <ScreenContainer>
@@ -40,7 +46,7 @@ export const HomeScreen: React.FC = () => {
         <BigButton
           label="Pacotes"
           icon="package-variant-closed"
-          onPress={() => navigation.navigate('Packages')}
+          onPress={goProOr('Packages')}
           mode="outlined"
         />
 
@@ -54,14 +60,14 @@ export const HomeScreen: React.FC = () => {
         <BigButton
           label="Profissionais"
           icon="account-tie"
-          onPress={() => navigation.navigate('Professionals')}
+          onPress={goProOr('Professionals')}
           mode="outlined"
         />
 
         <BigButton
           label="Relatórios"
           icon="chart-line"
-          onPress={() => navigation.navigate('Dashboard')}
+          onPress={goProOr('Dashboard')}
           mode="outlined"
         />
 

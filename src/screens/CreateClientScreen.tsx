@@ -15,6 +15,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer, BigButton } from '../components';
 import { useClients } from '../hooks/useClients';
+import { useEntitlement } from '../context/EntitlementContext';
 import type { RootStackParamList } from '../types';
 
 type CreateClientRouteProp = RouteProp<RootStackParamList, 'CreateClient'>;
@@ -24,7 +25,8 @@ export const CreateClientScreen: React.FC = () => {
   const navigation = useNavigation<CreateClientNavigationProp>();
   const route = useRoute<CreateClientRouteProp>();
   const { clientId } = route.params ?? {};
-  const { createClient, updateClient, getClientById } = useClients();
+  const { clients, createClient, updateClient, getClientById } = useClients();
+  const { clientLimit } = useEntitlement();
   const theme = useTheme();
   const isEditing = !!clientId;
 
@@ -57,6 +59,19 @@ export const CreateClientScreen: React.FC = () => {
   const handleSave = () => {
     if (!name.trim()) {
       showSnackbar('Digite o nome da cliente');
+      return;
+    }
+
+    // Limite do plano gratuito (só ao criar; edição sempre permitida)
+    if (!isEditing && clientLimit !== null && clients.length >= clientLimit) {
+      Alert.alert(
+        'Limite do plano gratuito',
+        `O plano gratuito permite até ${clientLimit} clientes. Assine o PRO para cadastrar sem limites.`,
+        [
+          { text: 'Agora não', style: 'cancel' },
+          { text: 'Ver PRO', onPress: () => navigation.navigate('Paywall') },
+        ]
+      );
       return;
     }
 

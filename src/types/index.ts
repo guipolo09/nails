@@ -289,4 +289,5 @@ export type RootStackParamList = {
   Dashboard: undefined;
   Professionals: undefined;
   BusinessHours: undefined;
+  Paywall: undefined;
 };

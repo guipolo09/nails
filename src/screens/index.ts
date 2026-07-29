@@ -21,5 +21,6 @@ export { AccountScreen } from './AccountScreen';
 export { DashboardScreen } from './DashboardScreen';
 export { ProfessionalsScreen } from './ProfessionalsScreen';
 export { BusinessHoursScreen } from './BusinessHoursScreen';
+export { PaywallScreen } from './PaywallScreen';
 export { LockScreen } from './LockScreen';
 export { ConsentScreen } from './ConsentScreen';

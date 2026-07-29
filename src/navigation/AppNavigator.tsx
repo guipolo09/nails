@@ -25,6 +25,7 @@ import {
   DashboardScreen,
   ProfessionalsScreen,
   BusinessHoursScreen,
+  PaywallScreen,
 } from '../screens';
 import type { RootStackParamList } from '../types';
 
@@ -177,6 +178,12 @@ export const AppNavigator: React.FC = () => {
         name="BusinessHours"
         component={BusinessHoursScreen}
         options={{ title: 'Horários de Funcionamento' }}
+      />
+
+      <Stack.Screen
+        name="Paywall"
+        component={PaywallScreen}
+        options={{ title: 'Nails PRO' }}
       />
     </Stack.Navigator>
   );

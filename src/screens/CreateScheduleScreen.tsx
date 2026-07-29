@@ -31,6 +31,7 @@ import {
   EmptyState,
 } from '../components';
 import { useServices, useAppointments, useSettings, useProfessionals } from '../hooks';
+import { useEntitlement } from '../context/EntitlementContext';
 import { clientRepository } from '../services/clientRepository';
 import { COLORS, MESSAGES } from '../utils/constants';
 import {
@@ -65,7 +66,17 @@ export const CreateScheduleScreen: React.FC = () => {
   const { settings } = useSettings();
   const { professionals } = useProfessionals();
   const activeProfessionals = professionals.filter(p => p.active);
+  const { isPro } = useEntitlement();
   const theme = useTheme();
+
+  // Recorrência é um recurso PRO
+  const handleToggleRecurrence = (value: boolean) => {
+    if (value && !isPro) {
+      navigation.navigate('Paywall');
+      return;
+    }
+    setRecurrenceEnabled(value);
+  };
 
   // Fluxo
   const [currentStep, setCurrentStep] = useState<Step>('client');
@@ -536,7 +547,7 @@ export const CreateScheduleScreen: React.FC = () => {
             </View>
             <Switch
               value={recurrenceEnabled}
-              onValueChange={setRecurrenceEnabled}
+              onValueChange={handleToggleRecurrence}
             />
           </View>
 

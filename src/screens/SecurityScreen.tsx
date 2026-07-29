@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenContainer } from '../components';
 import { useAuth } from '../context/AuthContext';
+import { useEntitlement } from '../context/EntitlementContext';
 import {
   isLockEnabled,
   setPin,
@@ -39,6 +40,7 @@ type Nav = StackNavigationProp<RootStackParamList, 'Security'>;
 export const SecurityScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { refreshLockConfig } = useAuth();
+  const { isPro } = useEntitlement();
 
   const [lockOn, setLockOn] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
@@ -113,6 +115,10 @@ export const SecurityScreen: React.FC = () => {
   };
 
   const handleExport = async () => {
+    if (!isPro) {
+      navigation.navigate('Paywall');
+      return;
+    }
     try {
       setExporting(true);
       await exportAllData(APP_VERSION);

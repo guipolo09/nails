@@ -105,29 +105,16 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           )}
         </View>
 
-        {/* Chips: pacote e/ou calendário */}
-        {(appointment.packageId || appointment.calendarEventId) && (
+        {/* Chip de pacote (quando o agendamento faz parte de um pacote) */}
+        {appointment.packageId && (
           <View style={styles.chipsRow}>
-            {appointment.packageId && (
-              <Chip
-                icon="package-variant-closed"
-                style={[styles.chip, { backgroundColor: theme.colors.secondaryContainer ?? theme.colors.primaryContainer }]}
-                textStyle={[styles.chipText, { color: theme.colors.secondary ?? theme.colors.primary }]}
-                compact
-              >
-                {packageLabel ? `Pacote · ${packageLabel}` : 'Pacote'}
-              </Chip>
-            )}
-            {appointment.calendarEventId && (
-              <Chip
-                icon="calendar-check"
-                style={[styles.chip, { backgroundColor: theme.colors.primaryContainer }]}
-                textStyle={styles.chipText}
-                compact
-              >
-                Agenda
-              </Chip>
-            )}
+            <Chip
+              icon="package-variant-closed"
+              style={[styles.packageChip, { backgroundColor: theme.colors.secondaryContainer ?? theme.colors.primaryContainer }]}
+              textStyle={[styles.packageChipText, { color: theme.colors.secondary ?? theme.colors.primary }]}
+            >
+              {packageLabel ? `Pacote · ${packageLabel}` : 'Pacote'}
+            </Chip>
           </View>
         )}
 
@@ -250,6 +237,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingLeft: 2,
   },
+  packageChip: {
+    alignSelf: 'flex-start',
+  },
+  packageChipText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   paymentRow: {
     marginTop: 10,
     paddingLeft: 2,
@@ -302,11 +296,6 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 14,
     marginTop: 4,
-  },
-  chip: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    height: 26,
   },
   chipText: {
     fontSize: 10,

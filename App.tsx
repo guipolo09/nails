@@ -15,6 +15,8 @@ import { AppNavigator } from './src/navigation';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { AccountProvider } from './src/context/AccountContext';
+import { EntitlementProvider } from './src/context/EntitlementContext';
+import { initMonetization } from './src/monetization';
 import { LockScreen, ConsentScreen } from './src/screens';
 import { hasConsented } from './src/services/consentService';
 import {
@@ -88,6 +90,7 @@ export default function App() {
     const bootstrap = async () => {
       await initDatabase();
       await runMigrations();
+      initMonetization(); // registra o RevenueCat se houver chave (senão, fica desligado)
     };
     bootstrap()
       .catch(err => console.error('Falha na inicialização do banco:', err))
@@ -109,9 +112,11 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <AccountProvider>
-              <AppContent />
-            </AccountProvider>
+            <EntitlementProvider>
+              <AccountProvider>
+                <AppContent />
+              </AccountProvider>
+            </EntitlementProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
